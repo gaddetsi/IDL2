@@ -39,9 +39,9 @@ def download_data(url: str):
 
     out_file.unlink()  # Delete the zip file after extraction
     
+if __name__=="__main__":
+    url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_75.zip"
+    file = download_data(url)
 
-url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_75.zip"
-file = download_data(url)
-
-url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_150.zip"
-file = download_data(url)
+    url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_150.zip"
+    file = download_data(url)
