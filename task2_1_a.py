@@ -134,6 +134,7 @@ if __name__ == "__main__":
     tf.random.set_seed(seed)
     keras.utils.set_random_seed(seed)
 
+    # preprocessing data
     X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
 
     print(X_train.shape, X_val.shape, X_test.shape)
@@ -170,7 +171,7 @@ if __name__ == "__main__":
 
     print(y_train.shape, y_val.shape, y_test.shape)
 
-    # #######################################
+    # ####################################### make model
     model = Sequential([
         Input(shape=input_shape),
         Conv2D(32, kernel_size=(3, 3), activation='relu'),
@@ -226,8 +227,6 @@ if __name__ == "__main__":
                 optimizer=keras.optimizers.Adadelta(),
                 metrics=[common_sense_categories_acc,'accuracy'])
 
-
-
     model.summary()
 
     model.fit(X_train, y_train,
@@ -238,6 +237,7 @@ if __name__ == "__main__":
 
     score = model.evaluate(X_test, y_test, verbose=0)
     print('Test loss:', score[0])
-    print('Test accuracy:', score[1])
+    print('Test common sense accuracy:', score[1])
+    print('Test accuracy:', score[2])
 
     model.save('saved_models/loss_mse.keras')
