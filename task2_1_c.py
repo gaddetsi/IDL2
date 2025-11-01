@@ -57,6 +57,8 @@ def m_numerical_cs_mae(y_true, y_pred):
 
 
 if __name__ == "__main__":
+    os.makedirs('saved_models', exist_ok=True)
+    
     seed=42
     np.random.seed(seed)
     tf.random.set_seed(seed)

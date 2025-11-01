@@ -7,8 +7,40 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras import backend as K
 from tensorflow.python.framework.ops import SymbolicTensor
 from keras.src import ops
+import os
 
 from get_dataset import download_data
+
+def print_metrics(pred_hours, true_hours, model_name):
+    """Print comprehensive evaluation metrics."""
+    diff_min = common_sense_categories_loss(true_hours,pred_hours)
+    
+    mean_err = np.mean(diff_min)
+    median_err = np.median(diff_min)
+    std_err = np.std(diff_min)
+    max_err = np.max(diff_min)
+    
+    within_30 = np.mean(diff_min <= 1) * 100
+    
+    print(f"\n{'=' * 80}")
+    print(f"{model_name} - TEST SET RESULTS")
+    print(f"{'=' * 80}")
+    print(f"Mean Absolute Error:    {mean_err:.2f} minutes")
+    print(f"Median Absolute Error:  {median_err:.2f} minutes")
+    print(f"Std Deviation:          {std_err:.2f} minutes")
+    print(f"Max Error:              {max_err:.2f} minutes")
+    print(f"\nAccuracy within thresholds:")
+    print(f"  Within 30 minutes:    {within_30:.1f}%")
+    
+    return {
+        'mean': mean_err,
+        'median': median_err,
+        'std': std_err,
+        'max': max_err,
+        'within_30': within_30,
+        'predictions': pred_hours,
+        'errors': diff_min
+    }
 
 def to_categorical(y, num_classes):
     """
@@ -29,6 +61,7 @@ def to_categorical(y, num_classes):
 
     return keras.utils.to_categorical(class_, num_classes)
 
+@tf.keras.utils.register_keras_serializable()
 def common_sense_categories_loss(y_true: SymbolicTensor, y_pred: SymbolicTensor) -> SymbolicTensor:
     """
     --------------------------------------------
@@ -51,6 +84,7 @@ def common_sense_categories_loss(y_true: SymbolicTensor, y_pred: SymbolicTensor)
     return csl                                         # return common sense loss
 
 
+@tf.keras.utils.register_keras_serializable()
 def common_sense_mse(y_true,y_pred):
     """
     --------------------------------------------
@@ -123,6 +157,7 @@ def load_data(seed: None) -> tuple[np.ndarray, np.ndarray]:
 
     return X_train, y_train, X_val, y_val, X_test, y_test
 
+
 def build_cnn_classification(input_shape, num_classes):
     """CNN for classification (predicting classes)."""
     inputs = keras.Input(shape=input_shape)
@@ -152,6 +187,8 @@ def build_cnn_classification(input_shape, num_classes):
     return keras.Model(inputs, outputs, name="cnn_classification")
 
 if __name__ == "__main__":
+    os.makedirs('saved_models', exist_ok=True)
+
     seed=42
     np.random.seed(seed)
     tf.random.set_seed(seed)
@@ -164,6 +201,7 @@ if __name__ == "__main__":
 
     batch_size = 128
     num_classes = 24
+    epochs = 50
     epochs = 50
 
     img_rows, img_cols = X_train.shape[1], X_train.shape[2]
@@ -207,7 +245,7 @@ if __name__ == "__main__":
     #     Dropout(0.5),
     #     Dense(num_classes, activation='softmax')
     # ])
-
+    
 
     ################## use own loss and accuracy (and regular accuracy) metric
     model.compile(loss=common_sense_mse,
@@ -221,6 +259,12 @@ if __name__ == "__main__":
     callbacks = [
         keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
+        ),
+        keras.callbacks.ModelCheckpoint(
+            'saved_models/temp_best.keras', 
+            monitor='val_loss', 
+            save_best_only=True, 
+            verbose=1
         )
     ]
 
@@ -231,33 +275,40 @@ if __name__ == "__main__":
             callbacks=callbacks,
             validation_data=(X_val, y_val))
 
+    # Load best model
+    model = keras.models.load_model('saved_models/temp_best.keras')
+    
+    # Evaluate the model
+    pred_categorical = model.predict(X_test,verbose=0)
+
+    metrics_categorical = print_metrics(pred_categorical, y_test, model_name="common_sense_mse")
+
     score = model.evaluate(X_test, y_test, verbose=0)
     print('Test loss:', score[0])
-    print('Test accuracy:', score[1])
+    print('Test common sense loss:', score[1])
+    print('Test accuracy:', score[2])
 
     model.save('saved_models/loss_common_sense_mse.keras')
 
 
     ################ init new model
-    model = Sequential([
-        Input(shape=input_shape),
-        Conv2D(32, kernel_size=(3, 3), activation='relu'),
-        Conv2D(64, (3, 3), activation='relu'),
-        MaxPooling2D(pool_size=(2, 2)),
-        Dropout(0.25),
-        Flatten(),
-        Dense(128, activation='relu'),
-        Dropout(0.5),
-        Dense(num_classes, activation='softmax')
-    ])
-
-    # model.compile(loss=keras.losses.categorical_crossentropy,
-    #               optimizer=keras.optimizers.Adadelta(),
-    #               metrics=[common_sense_categories_acc,'accuracy'])
+    model = build_cnn_classification(input_shape, num_classes)
+    # model = Sequential([
+    #     Input(shape=input_shape),
+    #     Conv2D(32, kernel_size=(3, 3), activation='relu'),
+    #     Conv2D(64, (3, 3), activation='relu'),
+    #     MaxPooling2D(pool_size=(2, 2)),
+    #     Dropout(0.25),
+    #     Flatten(),
+    #     Dense(128, activation='relu'),
+    #     Dropout(0.5),
+    #     Dense(num_classes, activation='softmax')
+    # ])
 
     model.compile(loss=keras.losses.MSE,
                 optimizer=keras.optimizers.Adadelta(),
                 metrics=[common_sense_categories_loss,'accuracy'])
+
 
     model.summary()
 
@@ -265,11 +316,41 @@ if __name__ == "__main__":
             batch_size=batch_size,
             epochs=epochs,
             verbose=1,
+            callbacks=callbacks,
             validation_data=(X_val, y_val))
+    
+    # Load best model
+    model = keras.models.load_model('saved_models/temp_best.keras')
 
     score = model.evaluate(X_test, y_test, verbose=0)
     print('Test loss:', score[0])
-    print('Test common sense accuracy:', score[1])
+    print('Test common sense loss:', score[1])
     print('Test accuracy:', score[2])
 
     model.save('saved_models/loss_mse.keras')
+
+    ################ init new model
+    model = build_cnn_classification(input_shape, num_classes)
+
+    model.compile(loss=keras.losses.categorical_crossentropy,
+                  optimizer=keras.optimizers.Adadelta(),
+                  metrics=[common_sense_categories_loss,'accuracy'])
+
+    model.summary()
+
+    model.fit(X_train, y_train,
+            batch_size=batch_size,
+            epochs=epochs,
+            verbose=1,
+            callbacks=callbacks,
+            validation_data=(X_val, y_val))
+
+    # Load best model
+    model = keras.models.load_model('saved_models/temp_best.keras')
+
+    score = model.evaluate(X_test, y_test, verbose=0)
+    print('Test loss:', score[0])
+    print('Test common sense loss:', score[1])
+    print('Test accuracy:', score[2])
+
+    model.save('saved_models/loss_crossentropy.keras')
