@@ -29,30 +29,26 @@ def to_categorical(y, num_classes):
 
     return keras.utils.to_categorical(class_, num_classes)
 
-def common_sense_categories_acc(y_true: SymbolicTensor, y_pred: SymbolicTensor) -> SymbolicTensor:
+def common_sense_categories_loss(y_true: SymbolicTensor, y_pred: SymbolicTensor) -> SymbolicTensor:
     """
     --------------------------------------------
-    Get common sense accuracy for categories
+    Get common sense loss for categories
     --------------------------------------------
     :param y_true: tensor filled with tensors with true labels
     :param y_pred: tensor filled with tensors with predicted labels
-    :return: common sense accuracy score tensor
+    :return: accuracy loss tensor
 
-    Common sense accuracy metric formula: 
-    common sense accuracy = 1-((highest possible common sence loss)/(max possible difference value)) 
-    = ((max possible difference value)-(highest possible common sence loss))/(max possible difference value)
-    = (amount correct)/(total possible correct amount)
+    Common sense loss formula: 
+    (highest possible common sence loss) = cls = min(|true_class-pred_class|, ||true_class-pred_class| - number_of_classes|)
     """
     # read what the class is
     y_true = tf.argmax(y_true, axis=-1) # when printed gives: tf.Tensor(0, shape=(), dtype=int64), here it gives 0 because it is class 0
     y_pred = tf.argmax(y_pred, axis=-1)
 
-    #calc accuracy (tf.cast makes the values have dtype float32 in this case)
-    diff = tf.abs(y_true - y_pred)                                # difference (not common sence yet)
-    csl = tf.minimum(diff, tf.abs(diff - num_classes))            # highest possible common sence loss (=common sence difference)
-    max_diff = tf.cast(tf.math.ceil(num_classes / 2), tf.float32) # max possible difference value
-    acc = 1-(tf.cast(csl, tf.float32) / max_diff)                 # accuracy
-    return acc
+    #calc common sense loss (cls)
+    diff = tf.abs(y_true - y_pred)                     # difference (not common sence yet)
+    csl = tf.minimum(diff, tf.abs(diff - num_classes)) # highest possible common sence loss (=common sence difference)
+    return csl                                         # return common sense loss
 
 
 def common_sense_mse(y_true,y_pred):
@@ -110,10 +106,10 @@ def common_sense_mse(y_true,y_pred):
 
 def load_data(seed: None) -> tuple[np.ndarray, np.ndarray]:
     url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_75.zip"
-    file = download_data(url)
+    download_data(url)
 
     url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_150.zip"
-    file = download_data(url)
+    download_data(url)
 
     X = np.load("data/A1_data_75/images.npy")
     y = np.load("data/A1_data_75/labels.npy")
@@ -127,6 +123,33 @@ def load_data(seed: None) -> tuple[np.ndarray, np.ndarray]:
 
     return X_train, y_train, X_val, y_val, X_test, y_test
 
+def build_cnn_classification(input_shape, num_classes):
+    """CNN for classification (predicting classes)."""
+    inputs = keras.Input(shape=input_shape)
+    
+    x = Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.25)(x)
+    
+    x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.25)(x)
+    
+    x = Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.25)(x)
+    
+    x = Flatten()(x)
+    x = Dense(256, activation='relu')(x)
+    x = Dropout(0.5)(x)
+    x = Dense(128, activation='relu')(x)
+    x = Dropout(0.3)(x)
+
+    outputs = Dense(num_classes, activation='softmax')(x)
+
+    return keras.Model(inputs, outputs, name="cnn_classification")
 
 if __name__ == "__main__":
     seed=42
@@ -141,7 +164,7 @@ if __name__ == "__main__":
 
     batch_size = 128
     num_classes = 24
-    epochs = 12
+    epochs = 50
 
     img_rows, img_cols = X_train.shape[1], X_train.shape[2]
     input_shape = (img_rows, img_cols, 1)
@@ -172,31 +195,40 @@ if __name__ == "__main__":
     print(y_train.shape, y_val.shape, y_test.shape)
 
     # ####################################### make model
-    model = Sequential([
-        Input(shape=input_shape),
-        Conv2D(32, kernel_size=(3, 3), activation='relu'),
-        Conv2D(64, (3, 3), activation='relu'),
-        MaxPooling2D(pool_size=(2, 2)),
-        Dropout(0.25),
-        Flatten(),
-        Dense(128, activation='relu'),
-        Dropout(0.5),
-        Dense(num_classes, activation='softmax')
-    ])
+    model = build_cnn_classification(input_shape, num_classes)
+    # model = Sequential([
+    #     Input(shape=input_shape),
+    #     Conv2D(32, kernel_size=(3, 3), activation='relu'),
+    #     Conv2D(64, (3, 3), activation='relu'),
+    #     MaxPooling2D(pool_size=(2, 2)),
+    #     Dropout(0.25),
+    #     Flatten(),
+    #     Dense(128, activation='relu'),
+    #     Dropout(0.5),
+    #     Dense(num_classes, activation='softmax')
+    # ])
 
 
     ################## use own loss and accuracy (and regular accuracy) metric
     model.compile(loss=common_sense_mse,
-                optimizer=keras.optimizers.Adadelta(),
-                metrics=[common_sense_categories_acc,'accuracy'])
+                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+                metrics=[common_sense_categories_loss,'accuracy'])
 
 
     model.summary()
+
+    # Callbacks
+    callbacks = [
+        keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
+        )
+    ]
 
     model.fit(X_train, y_train,
             batch_size=batch_size,
             epochs=epochs,
             verbose=1,
+            callbacks=callbacks,
             validation_data=(X_val, y_val))
 
     score = model.evaluate(X_test, y_test, verbose=0)
@@ -225,7 +257,7 @@ if __name__ == "__main__":
 
     model.compile(loss=keras.losses.MSE,
                 optimizer=keras.optimizers.Adadelta(),
-                metrics=[common_sense_categories_acc,'accuracy'])
+                metrics=[common_sense_categories_loss,'accuracy'])
 
     model.summary()
 
