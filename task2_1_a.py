@@ -22,7 +22,7 @@ def print_metrics(pred_hours, true_hours, model_name, num_classes=24):
     
     within_30 = np.mean(diff_min <= 1) * 100
 
-    minutes_per_class = 60//num_classes//12
+    minutes_per_class = 60//(num_classes//12)
 
     print(f"\n{'=' * 80}")
     print(f"{model_name} - TEST SET RESULTS")
