@@ -11,7 +11,7 @@ import os
 
 from get_dataset import download_data
 
-def print_metrics(pred_hours, true_hours, model_name):
+def print_metrics(pred_hours, true_hours, model_name, num_classes=24):
     """Print comprehensive evaluation metrics."""
     diff_min = common_sense_categories_loss(true_hours,pred_hours)
     
@@ -21,14 +21,16 @@ def print_metrics(pred_hours, true_hours, model_name):
     max_err = np.max(diff_min)
     
     within_30 = np.mean(diff_min <= 1) * 100
-    
+
+    minutes_per_class = 60//num_classes//12
+
     print(f"\n{'=' * 80}")
     print(f"{model_name} - TEST SET RESULTS")
     print(f"{'=' * 80}")
-    print(f"Mean Absolute Error:    {mean_err:.2f} minutes")
-    print(f"Median Absolute Error:  {median_err:.2f} minutes")
-    print(f"Std Deviation:          {std_err:.2f} minutes")
-    print(f"Max Error:              {max_err:.2f} minutes")
+    print(f"Mean Absolute Error:    {mean_err:.2f} of {minutes_per_class} minutes")
+    print(f"Median Absolute Error:  {median_err:.2f} of {minutes_per_class} minutes")
+    print(f"Std Deviation:          {std_err:.2f} of {minutes_per_class} minutes")
+    print(f"Max Error:              {max_err:.2f} of {minutes_per_class} minutes")
     print(f"\nAccuracy within thresholds:")
     print(f"  Within 30 minutes:    {within_30:.1f}%")
     
@@ -158,7 +160,7 @@ def load_data(seed: None) -> tuple[np.ndarray, np.ndarray]:
     return X_train, y_train, X_val, y_val, X_test, y_test
 
 
-def build_cnn_classification(input_shape, num_classes):
+def build_cnn_catagorical(input_shape, num_classes):
     """CNN for classification (predicting classes)."""
     inputs = keras.Input(shape=input_shape)
     
@@ -233,7 +235,7 @@ if __name__ == "__main__":
     print(y_train.shape, y_val.shape, y_test.shape)
 
     # ####################################### make model
-    model = build_cnn_classification(input_shape, num_classes)
+    model = build_cnn_catagorical(input_shape, num_classes)
     # model = Sequential([
     #     Input(shape=input_shape),
     #     Conv2D(32, kernel_size=(3, 3), activation='relu'),
@@ -292,7 +294,7 @@ if __name__ == "__main__":
 
 
     ################ init new model
-    model = build_cnn_classification(input_shape, num_classes)
+    model = build_cnn_catagorical(input_shape, num_classes)
     # model = Sequential([
     #     Input(shape=input_shape),
     #     Conv2D(32, kernel_size=(3, 3), activation='relu'),
@@ -330,7 +332,7 @@ if __name__ == "__main__":
     model.save('saved_models/loss_mse.keras')
 
     ################ init new model
-    model = build_cnn_classification(input_shape, num_classes)
+    model = build_cnn_catagorical(input_shape, num_classes)
 
     model.compile(loss=keras.losses.categorical_crossentropy,
                   optimizer=keras.optimizers.Adadelta(),
