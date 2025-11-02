@@ -285,7 +285,7 @@ if __name__ == "__main__":
     model = build_cnn_catagorical(input_shape, num_classes)
 
     model.compile(loss=keras.losses.MSE,
-                optimizer=keras.optimizers.Adadelta(),
+                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                 metrics=[common_sense_categories_loss,'accuracy'])
 
 
@@ -312,7 +312,7 @@ if __name__ == "__main__":
     model = build_cnn_catagorical(input_shape, num_classes)
 
     model.compile(loss=keras.losses.categorical_crossentropy,
-                  optimizer=keras.optimizers.Adadelta(),
+                  optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                   metrics=[common_sense_categories_loss,'accuracy'])
 
     model.summary()
