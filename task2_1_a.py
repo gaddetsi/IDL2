@@ -11,6 +11,10 @@ import os
 
 from get_dataset import download_data
 
+num_classes = 24
+batch_size = 128
+epochs = 50
+
 def print_metrics(pred_hours, true_hours, model_name, num_classes=24):
     """Print comprehensive evaluation metrics."""
     diff_min = common_sense_categories_loss(true_hours,pred_hours)
@@ -140,7 +144,7 @@ def common_sense_mse(y_true,y_pred):
     return loss
 
 
-def load_data(seed: None) -> tuple[np.ndarray, np.ndarray]:
+def load_data(seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_75.zip"
     download_data(url)
 
@@ -201,11 +205,6 @@ if __name__ == "__main__":
 
     print(X_train.shape, X_val.shape, X_test.shape)
 
-    batch_size = 128
-    num_classes = 24
-    epochs = 50
-    epochs = 50
-
     img_rows, img_cols = X_train.shape[1], X_train.shape[2]
     input_shape = (img_rows, img_cols, 1)
 
@@ -236,17 +235,6 @@ if __name__ == "__main__":
 
     # ####################################### make model
     model = build_cnn_catagorical(input_shape, num_classes)
-    # model = Sequential([
-    #     Input(shape=input_shape),
-    #     Conv2D(32, kernel_size=(3, 3), activation='relu'),
-    #     Conv2D(64, (3, 3), activation='relu'),
-    #     MaxPooling2D(pool_size=(2, 2)),
-    #     Dropout(0.25),
-    #     Flatten(),
-    #     Dense(128, activation='relu'),
-    #     Dropout(0.5),
-    #     Dense(num_classes, activation='softmax')
-    # ])
     
 
     ################## use own loss and accuracy (and regular accuracy) metric
@@ -295,17 +283,6 @@ if __name__ == "__main__":
 
     ################ init new model
     model = build_cnn_catagorical(input_shape, num_classes)
-    # model = Sequential([
-    #     Input(shape=input_shape),
-    #     Conv2D(32, kernel_size=(3, 3), activation='relu'),
-    #     Conv2D(64, (3, 3), activation='relu'),
-    #     MaxPooling2D(pool_size=(2, 2)),
-    #     Dropout(0.25),
-    #     Flatten(),
-    #     Dense(128, activation='relu'),
-    #     Dropout(0.5),
-    #     Dense(num_classes, activation='softmax')
-    # ])
 
     model.compile(loss=keras.losses.MSE,
                 optimizer=keras.optimizers.Adadelta(),

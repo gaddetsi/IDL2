@@ -11,7 +11,8 @@ wheels/
 
 # data
 data/
-# models
+# models and plots
 saved_models/
+images/
 # notes
 test.py
