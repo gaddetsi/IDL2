@@ -13,7 +13,7 @@ from get_dataset import download_data
 
 num_classes = 24
 batch_size = 128
-epochs = 50
+epochs = 1000 # we use early stopping, so not all epochs will be used
 
 def print_metrics(pred_hours, true_hours, model_name, num_classes=24):
     """Print comprehensive evaluation metrics."""
@@ -163,37 +163,37 @@ def load_data(seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray
 
     return X_train, y_train, X_val, y_val, X_test, y_test
 
+# hier
+# def build_cnn_catagorical(input_shape, num_classes):
+#     """CNN for classification (predicting classes)."""
+#     inputs = keras.Input(shape=input_shape)
+    
+#     x = Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
+#     x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+#     x = MaxPooling2D((2, 2))(x)
+#     x = Dropout(0.25)(x)
+    
+#     x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+#     x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+#     x = MaxPooling2D((2, 2))(x)
+#     x = Dropout(0.25)(x)
+    
+#     x = Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+#     x = MaxPooling2D((2, 2))(x)
+#     x = Dropout(0.25)(x)
+    
+#     x = Flatten()(x)
+#     x = Dense(256, activation='relu')(x)
+#     x = Dropout(0.5)(x)
+#     x = Dense(128, activation='relu')(x)
+#     x = Dropout(0.3)(x)
+
+#     outputs = Dense(num_classes, activation='softmax')(x)
+
+#     return keras.Model(inputs, outputs, name="cnn_classification")
 
 def build_cnn_catagorical(input_shape, num_classes):
-    """CNN for classification (predicting classes)."""
-    inputs = keras.Input(shape=input_shape)
-    
-    x = Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
-    x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.25)(x)
-    
-    x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-    x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.25)(x)
-    
-    x = Conv2D(128, (3, 3), activation='relu', padding='same')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.25)(x)
-    
-    x = Flatten()(x)
-    x = Dense(256, activation='relu')(x)
-    x = Dropout(0.5)(x)
-    x = Dense(128, activation='relu')(x)
-    x = Dropout(0.3)(x)
-
-    outputs = Dense(num_classes, activation='softmax')(x)
-
-    return keras.Model(inputs, outputs, name="cnn_classification")
-
-def build_cnn_sin_cos(input_shape):
-    """CNN for periodic regression (predicting sin/cos of time angle)."""
+    """CNN for predicting categorical values."""
     inputs = Input(shape=input_shape)
     
     # First conv block
@@ -235,10 +235,10 @@ def build_cnn_sin_cos(input_shape):
     x = Activation('relu')(x)
     x = Dropout(0.3)(x)
 
-    # Output layer: 2 nodes for cos and sin, bounded by tanh
-    outputs = Dense(2, activation='tanh')(x)
+    # Output layer: num_classes amount of nodes
+    outputs = Dense(num_classes, activation='softmax')(x)
 
-    return keras.Model(inputs, outputs, name="cnn_periodic")
+    return keras.Model(inputs, outputs, name="cnn_classification")
 
 if __name__ == "__main__":
     os.makedirs('saved_models', exist_ok=True)
@@ -290,19 +290,15 @@ if __name__ == "__main__":
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                 metrics=[common_sense_categories_loss,'accuracy'])
 
-
     model.summary()
 
-    # Callbacks
+    # make callbacks
     callbacks = [
         keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
         ),
-        keras.callbacks.ModelCheckpoint(
-            'saved_models/temp_best.keras', 
-            monitor='val_loss', 
-            save_best_only=True, 
-            verbose=1
+        keras.callbacks.EarlyStopping(
+            monitor='val_loss', patience=15, verbose=1, restore_best_weights=True
         )
     ]
 
@@ -312,20 +308,17 @@ if __name__ == "__main__":
             verbose=1,
             callbacks=callbacks,
             validation_data=(X_val, y_val))
-
-    # Load best model
-    model = keras.models.load_model('saved_models/temp_best.keras')
     
-    # Evaluate the model
-    pred_categorical = model.predict(X_test,verbose=0)
-
-    metrics_categorical = print_metrics(pred_categorical, y_test, model_name="common_sense_mse")
+    # evaluate the model
+    categorical_predictions = model.predict(X_test,verbose=0)
+    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="common_sense_mse")
 
     score = model.evaluate(X_test, y_test, verbose=0)
     print('Test loss:', score[0])
     print('Test common sense loss:', score[1])
     print('Test accuracy:', score[2])
 
+    # save model
     model.save('saved_models/loss_common_sense_mse.keras')
 
 
@@ -346,14 +339,16 @@ if __name__ == "__main__":
             callbacks=callbacks,
             validation_data=(X_val, y_val))
     
-    # Load best model
-    model = keras.models.load_model('saved_models/temp_best.keras')
+    # evaluate the model
+    categorical_predictions = model.predict(X_test,verbose=0)
+    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="regular_mse")
 
     score = model.evaluate(X_test, y_test, verbose=0)
     print('Test loss:', score[0])
     print('Test common sense loss:', score[1])
     print('Test accuracy:', score[2])
 
+    # save model
     model.save('saved_models/loss_mse.keras')
 
     ################ init new model
@@ -372,12 +367,14 @@ if __name__ == "__main__":
             callbacks=callbacks,
             validation_data=(X_val, y_val))
 
-    # Load best model
-    model = keras.models.load_model('saved_models/temp_best.keras')
+    # evaluate the model
+    categorical_predictions = model.predict(X_test,verbose=0)
+    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="loss_crossentropy")
 
     score = model.evaluate(X_test, y_test, verbose=0)
     print('Test loss:', score[0])
     print('Test common sense loss:', score[1])
     print('Test accuracy:', score[2])
 
+    # save model
     model.save('saved_models/loss_crossentropy.keras')
