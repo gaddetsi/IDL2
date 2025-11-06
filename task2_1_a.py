@@ -110,7 +110,7 @@ def common_sense_mse(y_true,y_pred, num_classes=NUM_CLASSES):
     y_pred = tf.cast(y_pred, tf.float32)
 
     # get squared difference
-    diff = tf.abs(y_true - y_pred)  # shape (batch, num_classes)
+    diff = tf.square(y_true - y_pred)  # shape (batch, num_classes)
 
     # get the class
     class_by_mult = tf.range(num_classes, dtype=tf.float32)
@@ -141,7 +141,7 @@ def common_sense_mse(y_true,y_pred, num_classes=NUM_CLASSES):
     diff_with_common_sense = diff * dist_matrix
 
     # average over classes to get the MSE with common_sense incorporated
-    loss = tf.reduce_mean(tf.square(diff_with_common_sense), axis=-1)
+    loss = tf.reduce_mean(diff_with_common_sense, axis=-1)
     return loss
 
 @tf.keras.utils.register_keras_serializable()
@@ -163,7 +163,7 @@ def common_sense_mse_0(y_true,y_pred, num_classes=NUM_CLASSES):
     y_pred = tf.cast(y_pred, tf.float32)
 
     # get squared difference
-    diff = tf.square(y_true - y_pred)  # shape (batch, num_classes)
+    diff = tf.abs(y_true - y_pred)  # shape (batch, num_classes)
 
     # get the class
     class_by_mult = tf.range(num_classes, dtype=tf.float32)
@@ -373,6 +373,38 @@ if __name__ == "__main__":
 
     # save model
     model.save('saved_models/loss_common_sense_mse.keras')
+
+
+
+    # ####################################### Init other model with differnt loss function
+    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
+    
+
+    ################## use own loss and accuracy (and regular accuracy) metric
+    model.compile(loss=common_sense_mse_0,
+                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+                metrics=[common_sense_categories_loss,'accuracy'])
+
+    model.summary()
+
+    model.fit(X_train, y_train,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            verbose=1,
+            callbacks=callbacks,
+            validation_data=(X_val, y_val))
+    
+    # evaluate the model
+    categorical_predictions = model.predict(X_test,verbose=0)
+    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="common_sense_mse")
+
+    score = model.evaluate(X_test, y_test, verbose=0)
+    print('Test loss:', score[0])
+    print('Test common sense loss:', score[1])
+    print('Test accuracy:', score[2])
+
+    # save model
+    model.save('saved_models/loss_common_sense_mse_0.keras')
 
 
     # ################ init new model

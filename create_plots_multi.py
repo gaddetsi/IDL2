@@ -8,7 +8,7 @@ import os, sys
 from pathlib import Path
 
 from task2_1_a import load_data
-from task2_1_c import h_numerical_cs_mae, m_numerical_cs_mae, print_metrics, common_sense_mse_cr
+from task2_1_c import h_numerical_cs_mse, m_numerical_cs_mse, print_metrics, common_sense_mse_cr
 
 def plot_error_histogram(errors, model_name, save_path=None):
     """Plot histogram of prediction errors."""
