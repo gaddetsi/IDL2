@@ -194,7 +194,7 @@ def common_sense_mse_0(y_true,y_pred, num_classes=NUM_CLASSES):
     diff_with_common_sense = diff * dist_matrix
 
     # average over classes to get the MSE with common_sense incorporated
-    loss = tf.reduce_mean(tf.square(diff_with_common_sense, axis=-1))
+    loss = tf.reduce_mean(tf.square(diff_with_common_sense), axis=-1)
     return loss
 
 def load_data(seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
