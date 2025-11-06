@@ -110,7 +110,7 @@ def common_sense_mse(y_true,y_pred, num_classes=NUM_CLASSES):
     y_pred = tf.cast(y_pred, tf.float32)
 
     # get squared difference
-    diff = tf.square(y_true - y_pred)  # shape (batch, num_classes)
+    diff = tf.abs(y_true - y_pred)  # shape (batch, num_classes)
 
     # get the class
     class_by_mult = tf.range(num_classes, dtype=tf.float32)
@@ -141,9 +141,61 @@ def common_sense_mse(y_true,y_pred, num_classes=NUM_CLASSES):
     diff_with_common_sense = diff * dist_matrix
 
     # average over classes to get the MSE with common_sense incorporated
-    loss = tf.reduce_mean(diff_with_common_sense, axis=-1)
+    loss = tf.reduce_mean(tf.square(diff_with_common_sense), axis=-1)
     return loss
 
+@tf.keras.utils.register_keras_serializable()
+def common_sense_mse_0(y_true,y_pred, num_classes=NUM_CLASSES):
+    """
+    --------------------------------------------
+    Get mean squared error with common sense
+    --------------------------------------------
+    :param y_true: tensor filled with tensors with true labels
+    :param y_pred: tensor filled with tensors with predicted labels
+    :return: mean squared error (MSE) with common sense incorporated (MSE, but we make classes that are further away have more loss)
+
+    Make a distribution that is bigger in value when farther away from the correct class. 
+    That distribution is then used as weights to alter the mean squared error (MSE).
+    What is returned is: MSE * distribution
+    """
+    # precausion, make them have the same dtype
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+
+    # get squared difference
+    diff = tf.square(y_true - y_pred)  # shape (batch, num_classes)
+
+    # get the class
+    class_by_mult = tf.range(num_classes, dtype=tf.float32)
+    true_class = tf.reduce_sum(y_true * class_by_mult, axis=-1) 
+    true_class = tf.cast(true_class, tf.int32)  # must be int for tf.roll
+    
+    # get distribution based on absolute distance for when index = 0
+    dist = [0]
+    max_amount = np.ceil(num_classes / 2)
+    for i in range(1,int(max_amount)):
+        dist.append(i)
+    for i in range(int(max_amount),0,-1):
+        dist.append(i)
+    dist = tf.constant(dist, dtype=tf.float32)
+
+    # rotate distribution so that 1 aligns with true class
+    # Ex: when index=0 is the correct class, then the distribution 
+    # for 4 classes would look like this: [1,2,3,2]
+    # , when index = 1 it would look like this: [2,1,2,3]
+    def rotate_dist(idx):
+        idx = tf.reshape(idx, ())  # make is a scalar
+        row = tf.roll(dist, shift=idx, axis=0)
+        return row
+
+    dist_matrix = tf.map_fn(rotate_dist, true_class, fn_output_signature=tf.float32) # loop over true_class rows
+
+    # multiply squared difference by distance weights
+    diff_with_common_sense = diff * dist_matrix
+
+    # average over classes to get the MSE with common_sense incorporated
+    loss = tf.reduce_mean(diff_with_common_sense, axis=-1)
+    return loss
 
 def load_data(seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_75.zip"
@@ -323,59 +375,59 @@ if __name__ == "__main__":
     model.save('saved_models/loss_common_sense_mse.keras')
 
 
-    ################ init new model
-    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
+    # ################ init new model
+    # model = build_cnn_catagorical(input_shape, NUM_CLASSES)
 
-    model.compile(loss=keras.losses.MSE,
-                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-                metrics=[common_sense_categories_loss,'accuracy'])
+    # model.compile(loss=keras.losses.MSE,
+    #             optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+    #             metrics=[common_sense_categories_loss,'accuracy'])
 
 
-    model.summary()
+    # model.summary()
 
-    model.fit(X_train, y_train,
-            batch_size=BATCH_SIZE,
-            epochs=EPOCHS,
-            verbose=1,
-            callbacks=callbacks,
-            validation_data=(X_val, y_val))
+    # model.fit(X_train, y_train,
+    #         batch_size=BATCH_SIZE,
+    #         epochs=EPOCHS,
+    #         verbose=1,
+    #         callbacks=callbacks,
+    #         validation_data=(X_val, y_val))
     
-    # evaluate the model
-    categorical_predictions = model.predict(X_test,verbose=0)
-    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="regular_mse")
+    # # evaluate the model
+    # categorical_predictions = model.predict(X_test,verbose=0)
+    # metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="regular_mse")
 
-    score = model.evaluate(X_test, y_test, verbose=0)
-    print('Test loss:', score[0])
-    print('Test common sense loss:', score[1])
-    print('Test accuracy:', score[2])
+    # score = model.evaluate(X_test, y_test, verbose=0)
+    # print('Test loss:', score[0])
+    # print('Test common sense loss:', score[1])
+    # print('Test accuracy:', score[2])
 
-    # save model
-    model.save('saved_models/loss_mse.keras')
+    # # save model
+    # model.save('saved_models/loss_mse.keras')
 
-    ################ init new model
-    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
+    # ################ init new model
+    # model = build_cnn_catagorical(input_shape, NUM_CLASSES)
 
-    model.compile(loss=keras.losses.categorical_crossentropy,
-                  optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-                  metrics=[common_sense_categories_loss,'accuracy'])
+    # model.compile(loss=keras.losses.categorical_crossentropy,
+    #               optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+    #               metrics=[common_sense_categories_loss,'accuracy'])
 
-    model.summary()
+    # model.summary()
 
-    model.fit(X_train, y_train,
-            batch_size=BATCH_SIZE,
-            epochs=EPOCHS,
-            verbose=1,
-            callbacks=callbacks,
-            validation_data=(X_val, y_val))
+    # model.fit(X_train, y_train,
+    #         batch_size=BATCH_SIZE,
+    #         epochs=EPOCHS,
+    #         verbose=1,
+    #         callbacks=callbacks,
+    #         validation_data=(X_val, y_val))
 
-    # evaluate the model
-    categorical_predictions = model.predict(X_test,verbose=0)
-    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="loss_crossentropy")
+    # # evaluate the model
+    # categorical_predictions = model.predict(X_test,verbose=0)
+    # metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="loss_crossentropy")
 
-    score = model.evaluate(X_test, y_test, verbose=0)
-    print('Test loss:', score[0])
-    print('Test common sense loss:', score[1])
-    print('Test accuracy:', score[2])
+    # score = model.evaluate(X_test, y_test, verbose=0)
+    # print('Test loss:', score[0])
+    # print('Test common sense loss:', score[1])
+    # print('Test accuracy:', score[2])
 
-    # save model
-    model.save('saved_models/loss_crossentropy.keras')
+    # # save model
+    # model.save('saved_models/loss_crossentropy.keras')
