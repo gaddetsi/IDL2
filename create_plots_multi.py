@@ -1,4 +1,4 @@
-# EXAMPLE USAGE: uv run ./create_plots_multi.py ./saved_models/multi_*
+# EXAMPLE USAGE: python ./create_plots_multi.py ./saved_models/multi_*
 
 import matplotlib.pyplot as plt
 import numpy as np
