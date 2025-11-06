@@ -78,7 +78,7 @@ def print_metrics(pred_time, true_time, model_name):
     }
 
 @tf.keras.utils.register_keras_serializable()
-def h_numerical_cs_mae(y_true, y_pred):
+def h_numerical_cs_mse(y_true, y_pred):
     """
     
     """
@@ -86,14 +86,14 @@ def h_numerical_cs_mae(y_true, y_pred):
     pred = y_pred[..., 0]
 
     diff = tf.abs(true - pred)
-    wrap = (12/11) - diff
+    wrap = 12 - diff
     cls = tf.minimum(diff, wrap)
 
-    mae = tf.reduce_mean(tf.abs(cls))
-    return mae
+    mse = tf.square(cls / 6)
+    return mse
 
 @tf.keras.utils.register_keras_serializable()
-def m_numerical_cs_mae(y_true, y_pred):
+def m_numerical_cs_mse(y_true, y_pred):
     """
     
     """
@@ -101,11 +101,11 @@ def m_numerical_cs_mae(y_true, y_pred):
     pred = y_pred[..., 0]
 
     diff = tf.abs(true - pred)
-    wrap = (60/59) - diff
+    wrap = 60 - diff
     cls = tf.minimum(diff, wrap)
 
-    mae = tf.reduce_mean(tf.abs(cls))
-    return mae
+    mse = tf.square(cls / 30)
+    return mse
 
 @tf.keras.utils.register_keras_serializable()
 def common_sense_mse_cr(y_true, y_pred):
@@ -265,27 +265,27 @@ def build_cnn_sin_cos(input_shape):
 if __name__ == "__main__":
     os.makedirs('saved_models', exist_ok=True)
     
-    # seed=42
-    # np.random.seed(seed)
-    # tf.random.set_seed(seed)
-    # keras.utils.set_random_seed(seed)
+    seed=42
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    keras.utils.set_random_seed(seed)
 
-    # X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
+    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
 
-    # print(X_train.shape, X_val.shape, X_test.shape)
+    print(X_train.shape, X_val.shape, X_test.shape)
 
-    # img_rows, img_cols = X_train.shape[1], X_train.shape[2]
-    # input_shape = (img_rows, img_cols, 1)
-    # print(input_shape)
+    img_rows, img_cols = X_train.shape[1], X_train.shape[2]
+    input_shape = (img_rows, img_cols, 1)
+    print(input_shape)
 
-    # # regression model with two outputs
-    # model = build_cnn_multi(input_shape)
+    # regression model with two outputs
+    model = build_cnn_multi(input_shape)
     
-    # model.compile(loss=[h_numerical_cs_mae, m_numerical_cs_mae],
-    #             optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-    #             metrics=['accuracy','accuracy'])
+    model.compile(loss=[h_numerical_cs_mse, m_numerical_cs_mse],
+                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+                metrics=['accuracy','accuracy'])
 
-    # model.summary()
+    model.summary()
 
     # Callbacks
     callbacks = [
@@ -297,21 +297,21 @@ if __name__ == "__main__":
         )
     ]
 
-    # model.fit(X_train, [y_train[:, 0], y_train[:, 1]],
-    #         batch_size=batch_size,
-    #         epochs=epochs,
-    #         verbose=1,
-    #         callbacks=callbacks,
-    #         validation_data=(X_val, [y_val[:, 0], y_val[:, 1]]))
+    model.fit(X_train, [y_train[:, 0], y_train[:, 1]],
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            verbose=1,
+            callbacks=callbacks,
+            validation_data=(X_val, [y_val[:, 0], y_val[:, 1]]))
 
-    # score = model.evaluate(X_test, [y_test[:, 0], y_test[:, 1]], verbose=0)
-    # print('Test loss:', score[0])
-    # print('Test hour loss:', score[1])
-    # print('Test minute loss:', score[2])
-    # print('Test hour accuracy:', score[3])
-    # print('Test minute accuracy:', score[4])
+    score = model.evaluate(X_test, [y_test[:, 0], y_test[:, 1]], verbose=0)
+    print('Test loss:', score[0])
+    print('Test hour loss:', score[1])
+    print('Test minute loss:', score[2])
+    print('Test hour accuracy:', score[3])
+    print('Test minute accuracy:', score[4])
 
-    # model.save('saved_models/multi_regression.keras')
+    model.save('saved_models/multi_regression.keras')
 
     seed=42
     np.random.seed(seed)
@@ -332,7 +332,7 @@ if __name__ == "__main__":
     # regression model with two outputs
     model = build_cnn_multi_class_reg(input_shape)
 
-    model.compile(loss=[common_sense_mse_cr, m_numerical_cs_mae],
+    model.compile(loss=[common_sense_mse_cr, m_numerical_cs_mse],
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                 metrics=['accuracy','accuracy'])
 

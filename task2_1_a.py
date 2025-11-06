@@ -110,7 +110,7 @@ def common_sense_mse(y_true,y_pred, num_classes=NUM_CLASSES):
     y_pred = tf.cast(y_pred, tf.float32)
 
     # get squared difference
-    diff = tf.square(y_true - y_pred)  # shape (batch, num_classes)
+    diff = tf.abs(y_true - y_pred)  # shape (batch, num_classes)
 
     # get the class
     class_by_mult = tf.range(num_classes, dtype=tf.float32)
@@ -118,11 +118,11 @@ def common_sense_mse(y_true,y_pred, num_classes=NUM_CLASSES):
     true_class = tf.cast(true_class, tf.int32)  # must be int for tf.roll
     
     # get distribution based on absolute distance for when index = 0
-    dist = [1]
+    dist = [0]
     max_amount = np.ceil(num_classes / 2)
-    for i in range(2,int(max_amount)+1):
+    for i in range(1,int(max_amount)):
         dist.append(i)
-    for i in range(int(max_amount)+1,1,-1):
+    for i in range(int(max_amount),0,-1):
         dist.append(i)
     dist = tf.constant(dist, dtype=tf.float32)
 
@@ -141,9 +141,8 @@ def common_sense_mse(y_true,y_pred, num_classes=NUM_CLASSES):
     diff_with_common_sense = diff * dist_matrix
 
     # average over classes to get the MSE with common_sense incorporated
-    loss = tf.reduce_mean(diff_with_common_sense, axis=-1)
+    loss = tf.reduce_mean(tf.square(diff_with_common_sense), axis=-1)
     return loss
-
 
 def load_data(seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_75.zip"
