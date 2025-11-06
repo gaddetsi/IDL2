@@ -8,7 +8,7 @@ from tensorflow.keras import backend as K
 from tensorflow.python.framework.ops import SymbolicTensor
 from sklearn.preprocessing import MinMaxScaler
 from keras.src import ops
-from task2_1_a import load_data, to_categorical, common_sense_mse
+from task2_1_a import load_data, to_categorical, common_sense_mse_0
 import os
 
 # uncomment if you want to use the cpu (needed for printing)
@@ -110,7 +110,7 @@ def m_numerical_cs_mse(y_true, y_pred):
 @tf.keras.utils.register_keras_serializable()
 def common_sense_mse_cr(y_true, y_pred):
     """common sense mse from task 2.1.a with num_classes = 12"""
-    return common_sense_mse(y_true, y_pred, num_classes=12)
+    return common_sense_mse_0(y_true, y_pred, num_classes=12)
 
 def build_cnn_multi(input_shape):
     """CNN with multi-headed regression (two outputs for hours and minutes)."""

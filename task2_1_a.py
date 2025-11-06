@@ -194,7 +194,7 @@ def common_sense_mse_0(y_true,y_pred, num_classes=NUM_CLASSES):
     diff_with_common_sense = diff * dist_matrix
 
     # average over classes to get the MSE with common_sense incorporated
-    loss = tf.reduce_mean(diff_with_common_sense, axis=-1)
+    loss = tf.reduce_mean(tf.diff_with_common_sense, axis=-1)
     return loss
 
 def load_data(seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -396,7 +396,7 @@ if __name__ == "__main__":
     
     # evaluate the model
     categorical_predictions = model.predict(X_test,verbose=0)
-    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="common_sense_mse")
+    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="common_sense_mse_0")
 
     score = model.evaluate(X_test, y_test, verbose=0)
     print('Test loss:', score[0])
