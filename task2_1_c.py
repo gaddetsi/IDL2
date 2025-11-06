@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, Input
+from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, Input, BatchNormalization, Activation
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import backend as K
 from tensorflow.python.framework.ops import SymbolicTensor
@@ -14,7 +14,7 @@ import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 batch_size = 128
-epochs = 50
+epochs = 60
 
 def split_to_diff_min(pred_hours, true_hours):
     """Calculate absolute difference in minutes between predicted and true times."""
@@ -115,7 +115,7 @@ def m_numerical_cs_mae(y_true, y_pred):
 
 def build_cnn_multi(input_shape):
     """CNN with multi-headed regression (two outputs for hours and minutes)."""
-    inputs = keras.Input(shape=input_shape)
+    inputs = Input(shape=input_shape)
     
     x = Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
     x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
@@ -140,7 +140,103 @@ def build_cnn_multi(input_shape):
     hour_output = Dense(1, activation='linear')(x)
     minute_output = Dense(1, activation='linear')(x)
 
-    return keras.Model(inputs, [hour_output, minute_output], name="cnn_classification")
+    return keras.Model(inputs, [hour_output, minute_output], name="cnn_multi_regression")
+
+def build_cnn_multi_big(input_shape):
+    """CNN with multi-headed regression (two outputs for hours and minutes)."""
+    inputs = Input(shape=input_shape)
+    
+    # First conv block
+    x = Conv2D(32, (3, 3), padding='same')(inputs)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Conv2D(32, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.2)(x)
+    
+    # Second conv block
+    x = Conv2D(64, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Conv2D(64, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.2)(x)
+
+    # Third conv block
+    x = Conv2D(128, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.3)(x)
+
+    # Dense layers
+    x = Flatten()(x)
+    x = Dense(256)(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.4)(x)
+
+    x = Dense(128)(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.3)(x)
+
+    hour_output = Dense(1, activation='linear')(x)
+    minute_output = Dense(1, activation='linear')(x)
+
+    return keras.Model(inputs, [hour_output, minute_output], name="cnn_multi_regression_big")
+
+def build_cnn_sin_cos(input_shape):
+    """CNN for periodic regression (predicting sin/cos of time angle)."""
+    inputs = Input(shape=input_shape)
+    
+    # First conv block
+    x = Conv2D(32, (3, 3), padding='same')(inputs)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Conv2D(32, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.2)(x)
+
+    # Second conv block
+    x = Conv2D(64, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Conv2D(64, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.2)(x)
+
+    # Third conv block
+    x = Conv2D(128, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.3)(x)
+
+    # Dense layers
+    x = Flatten()(x)
+    x = Dense(256)(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.4)(x)
+
+    x = Dense(128)(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.3)(x)
+
+    # Output layer: 2 nodes for cos and sin, bounded by tanh
+    outputs = Dense(2, activation='tanh')(x)
+
+    return keras.Model(inputs, outputs, name="cnn_periodic")
 
 
 if __name__ == "__main__":
@@ -208,3 +304,31 @@ if __name__ == "__main__":
     print('Test minute accuracy:', score[4])
 
     model.save('saved_models/multi_regression.keras')
+
+    # big regression model with two outputs
+    model = build_cnn_multi_big(input_shape)
+    
+    model.compile(loss=[h_numerical_cs_mae, m_numerical_cs_mae],
+                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+                metrics=['accuracy','accuracy'])
+
+    model.summary()
+
+    model.fit(X_train, [y_train[:, 0], y_train[:, 1]],
+            batch_size=batch_size,
+            epochs=epochs,
+            verbose=1,
+            callbacks=callbacks,
+            validation_data=(X_val, [y_val[:, 0], y_val[:, 1]]))
+    
+    # Load best model
+    model = keras.models.load_model('saved_models/temp_best.keras')
+
+    score = model.evaluate(X_test, [y_test[:, 0], y_test[:, 1]], verbose=0)
+    print('Test loss:', score[0])
+    print('Test hour loss:', score[1])
+    print('Test minute loss:', score[2])
+    print('Test hour accuracy:', score[3])
+    print('Test minute accuracy:', score[4])
+
+    model.save('saved_models/multi_regression_big.keras')

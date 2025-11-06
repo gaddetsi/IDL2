@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, Input
+from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, Input, BatchNormalization, Activation
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import backend as K
 from tensorflow.python.framework.ops import SymbolicTensor
@@ -191,6 +191,54 @@ def build_cnn_catagorical(input_shape, num_classes):
     outputs = Dense(num_classes, activation='softmax')(x)
 
     return keras.Model(inputs, outputs, name="cnn_classification")
+
+def build_cnn_sin_cos(input_shape):
+    """CNN for periodic regression (predicting sin/cos of time angle)."""
+    inputs = Input(shape=input_shape)
+    
+    # First conv block
+    x = Conv2D(32, (3, 3), padding='same')(inputs)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Conv2D(32, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.2)(x)
+
+    # Second conv block
+    x = Conv2D(64, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Conv2D(64, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.2)(x)
+
+    # Third conv block
+    x = Conv2D(128, (3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.3)(x)
+
+    # Dense layers
+    x = Flatten()(x)
+    x = Dense(256)(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.4)(x)
+
+    x = Dense(128)(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.3)(x)
+
+    # Output layer: 2 nodes for cos and sin, bounded by tanh
+    outputs = Dense(2, activation='tanh')(x)
+
+    return keras.Model(inputs, outputs, name="cnn_periodic")
 
 if __name__ == "__main__":
     os.makedirs('saved_models', exist_ok=True)

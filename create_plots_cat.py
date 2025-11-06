@@ -1,3 +1,5 @@
+# EXAMPLE USAGE: uv run ./create_plots_cat.py ./saved_models/loss_*
+
 import matplotlib.pyplot as plt
 import numpy as np
 from tensorflow import keras
