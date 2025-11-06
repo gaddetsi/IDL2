@@ -11,9 +11,9 @@ import os
 
 from get_dataset import download_data
 
-num_classes = 24
-batch_size = 128
-epochs = 1000 # we use early stopping, so not all epochs will be used
+NUM_CLASSES = 24
+BATCH_SIZE = 128
+EPOCHS = 1000 # we use early stopping, so not all epochs will be used
 
 def print_metrics(pred_hours, true_hours, model_name, num_classes=24):
     """Print comprehensive evaluation metrics."""
@@ -50,8 +50,9 @@ def print_metrics(pred_hours, true_hours, model_name, num_classes=24):
 
 def to_categorical(y, num_classes):
     """
+    --------------------------------------------
     Convert time to categorical labels.
-
+    --------------------------------------------
     :param y: numpy array of shape (num_samples, 2) where the first column is hour (0-11)
               and the second column is minute (0-59)
     :param num_classes: total number of classes
@@ -86,12 +87,12 @@ def common_sense_categories_loss(y_true: SymbolicTensor, y_pred: SymbolicTensor)
 
     #calc common sense loss (cls)
     diff = tf.abs(y_true - y_pred)                     # difference (not common sence yet)
-    csl = tf.minimum(diff, tf.abs(diff - num_classes)) # highest possible common sence loss (=common sence difference)
+    csl = tf.minimum(diff, tf.abs(diff - NUM_CLASSES)) # highest possible common sence loss (=common sence difference)
     return csl                                         # return common sense loss
 
 
 @tf.keras.utils.register_keras_serializable()
-def common_sense_mse(y_true,y_pred):
+def common_sense_mse(y_true,y_pred, num_classes=NUM_CLASSES):
     """
     --------------------------------------------
     Get mean squared error with common sense
@@ -273,16 +274,16 @@ if __name__ == "__main__":
     # ex.
     # y_train = to_categorical(y_train, 720) # when doing 720 labels use this
 
-    y_train = to_categorical(y_train, num_classes)
+    y_train = to_categorical(y_train, NUM_CLASSES)
     print(f"Class and amount:\n{np.sum(y_train,axis=0)}\n") # print class distribution, the index is the class, the amount is how many times that class is in the data
 
-    y_val = to_categorical(y_val, num_classes)
-    y_test = to_categorical(y_test, num_classes)
+    y_val = to_categorical(y_val, NUM_CLASSES)
+    y_test = to_categorical(y_test, NUM_CLASSES)
 
     print(y_train.shape, y_val.shape, y_test.shape)
 
     # ####################################### make model
-    model = build_cnn_catagorical(input_shape, num_classes)
+    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
     
 
     ################## use own loss and accuracy (and regular accuracy) metric
@@ -303,8 +304,8 @@ if __name__ == "__main__":
     ]
 
     model.fit(X_train, y_train,
-            batch_size=batch_size,
-            epochs=epochs,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
             verbose=1,
             callbacks=callbacks,
             validation_data=(X_val, y_val))
@@ -323,7 +324,7 @@ if __name__ == "__main__":
 
 
     ################ init new model
-    model = build_cnn_catagorical(input_shape, num_classes)
+    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
 
     model.compile(loss=keras.losses.MSE,
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
@@ -333,8 +334,8 @@ if __name__ == "__main__":
     model.summary()
 
     model.fit(X_train, y_train,
-            batch_size=batch_size,
-            epochs=epochs,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
             verbose=1,
             callbacks=callbacks,
             validation_data=(X_val, y_val))
@@ -352,7 +353,7 @@ if __name__ == "__main__":
     model.save('saved_models/loss_mse.keras')
 
     ################ init new model
-    model = build_cnn_catagorical(input_shape, num_classes)
+    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
 
     model.compile(loss=keras.losses.categorical_crossentropy,
                   optimizer=keras.optimizers.Adam(learning_rate=1e-3),
@@ -361,8 +362,8 @@ if __name__ == "__main__":
     model.summary()
 
     model.fit(X_train, y_train,
-            batch_size=batch_size,
-            epochs=epochs,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
             verbose=1,
             callbacks=callbacks,
             validation_data=(X_val, y_val))

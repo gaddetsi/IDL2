@@ -8,7 +8,7 @@ import os, sys
 from pathlib import Path
 
 from task2_1_a import load_data
-from task2_1_c import h_numerical_cs_mae, m_numerical_cs_mae, print_metrics
+from task2_1_c import h_numerical_cs_mae, m_numerical_cs_mae, print_metrics, common_sense_mse_cr
 
 def plot_error_histogram(errors, model_name, save_path=None):
     """Plot histogram of prediction errors."""
@@ -28,7 +28,11 @@ def plot_error_histogram(errors, model_name, save_path=None):
 def to_decimal(y):
     """Convert split hours and minutes to decimal hours."""
     hours = y[0]
-    decimal_hours = hours + (y[1] / 59)
+    minutes = y[1]
+    if hours.shape[1] == 12:
+        hours = np.argmax(hours, axis=1).reshape(-1, 1)
+
+    decimal_hours = hours + (minutes / 59)
     return decimal_hours
 
 def plot_predictions_vs_true(pred, true, model_name, save_path=None):
@@ -73,6 +77,7 @@ if __name__ == "__main__":
         metrics = print_metrics(y_pred, y_test_split, curr_model)
 
         errors = metrics['errors']
+
 
         # convert split hours and minutes to decimal hours for plotting
         true_decimal = to_decimal(y_test_split)
