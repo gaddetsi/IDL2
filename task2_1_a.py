@@ -293,14 +293,8 @@ def build_cnn_catagorical(input_shape, num_classes):
 
     return keras.Model(inputs, outputs, name="cnn_classification")
 
-if __name__ == "__main__":
-    os.makedirs('saved_models', exist_ok=True)
 
-    seed=42
-    np.random.seed(seed)
-    tf.random.set_seed(seed)
-    keras.utils.set_random_seed(seed)
-
+def preprocess_cat():
     # preprocessing data
     X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
 
@@ -325,7 +319,6 @@ if __name__ == "__main__":
     # Convert labels to one-hot encoding
     # ex.
     # y_train = to_categorical(y_train, 720) # when doing 720 labels use this
-
     y_train = to_categorical(y_train, NUM_CLASSES)
     print(f"Class and amount:\n{np.sum(y_train,axis=0)}\n") # print class distribution, the index is the class, the amount is how many times that class is in the data
 
@@ -333,13 +326,25 @@ if __name__ == "__main__":
     y_test = to_categorical(y_test, NUM_CLASSES)
 
     print(y_train.shape, y_val.shape, y_test.shape)
+    return X_train, y_train, X_val, y_val, X_test, y_test, input_shape
+
+if __name__ == "__main__":
+    os.makedirs('saved_models', exist_ok=True)
+
+    seed=42
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    keras.utils.set_random_seed(seed)
+
+    # load preprocessed data
+    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat()
 
     # ####################################### make model
     model = build_cnn_catagorical(input_shape, NUM_CLASSES)
     
 
     ################## use own loss and accuracy (and regular accuracy) metric
-    model.compile(loss=common_sense_mse,
+    model.compile(loss=common_sense_mse_0,
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                 metrics=[common_sense_categories_loss,'accuracy'])
 
@@ -375,7 +380,8 @@ if __name__ == "__main__":
     model.save('saved_models/loss_common_sense_mse.keras')
 
 
-
+    # load preprocessed data
+    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat()
     # ####################################### Init other model with differnt loss function
     model = build_cnn_catagorical(input_shape, NUM_CLASSES)
     
@@ -386,6 +392,16 @@ if __name__ == "__main__":
                 metrics=[common_sense_categories_loss,'accuracy'])
 
     model.summary()
+
+    # make callbacks
+    callbacks = [
+        keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
+        ),
+        keras.callbacks.EarlyStopping(
+            monitor='val_loss', patience=15, verbose=1, restore_best_weights=True
+        )
+    ]
 
     model.fit(X_train, y_train,
             batch_size=BATCH_SIZE,
@@ -406,60 +422,63 @@ if __name__ == "__main__":
     # save model
     model.save('saved_models/loss_common_sense_mse_0.keras')
 
+    # load preprocessed data
+    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat()
+    ################ init new model
+    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
 
-    # ################ init new model
-    # model = build_cnn_catagorical(input_shape, NUM_CLASSES)
-
-    # model.compile(loss=keras.losses.MSE,
-    #             optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-    #             metrics=[common_sense_categories_loss,'accuracy'])
+    model.compile(loss=keras.losses.MSE,
+                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+                metrics=[common_sense_categories_loss,'accuracy'])
 
 
-    # model.summary()
+    model.summary()
 
-    # model.fit(X_train, y_train,
-    #         batch_size=BATCH_SIZE,
-    #         epochs=EPOCHS,
-    #         verbose=1,
-    #         callbacks=callbacks,
-    #         validation_data=(X_val, y_val))
+    model.fit(X_train, y_train,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            verbose=1,
+            callbacks=callbacks,
+            validation_data=(X_val, y_val))
     
-    # # evaluate the model
-    # categorical_predictions = model.predict(X_test,verbose=0)
-    # metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="regular_mse")
+    # evaluate the model
+    categorical_predictions = model.predict(X_test,verbose=0)
+    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="regular_mse")
 
-    # score = model.evaluate(X_test, y_test, verbose=0)
-    # print('Test loss:', score[0])
-    # print('Test common sense loss:', score[1])
-    # print('Test accuracy:', score[2])
+    score = model.evaluate(X_test, y_test, verbose=0)
+    print('Test loss:', score[0])
+    print('Test common sense loss:', score[1])
+    print('Test accuracy:', score[2])
 
-    # # save model
-    # model.save('saved_models/loss_mse.keras')
+    # save model
+    model.save('saved_models/loss_mse.keras')
 
-    # ################ init new model
-    # model = build_cnn_catagorical(input_shape, NUM_CLASSES)
+    # load preprocessed data
+    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat()
+    ################ init new model
+    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
 
-    # model.compile(loss=keras.losses.categorical_crossentropy,
-    #               optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-    #               metrics=[common_sense_categories_loss,'accuracy'])
+    model.compile(loss=keras.losses.categorical_crossentropy,
+                  optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+                  metrics=[common_sense_categories_loss,'accuracy'])
 
-    # model.summary()
+    model.summary()
 
-    # model.fit(X_train, y_train,
-    #         batch_size=BATCH_SIZE,
-    #         epochs=EPOCHS,
-    #         verbose=1,
-    #         callbacks=callbacks,
-    #         validation_data=(X_val, y_val))
+    model.fit(X_train, y_train,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            verbose=1,
+            callbacks=callbacks,
+            validation_data=(X_val, y_val))
 
-    # # evaluate the model
-    # categorical_predictions = model.predict(X_test,verbose=0)
-    # metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="loss_crossentropy")
+    # evaluate the model
+    categorical_predictions = model.predict(X_test,verbose=0)
+    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="loss_crossentropy")
 
-    # score = model.evaluate(X_test, y_test, verbose=0)
-    # print('Test loss:', score[0])
-    # print('Test common sense loss:', score[1])
-    # print('Test accuracy:', score[2])
+    score = model.evaluate(X_test, y_test, verbose=0)
+    print('Test loss:', score[0])
+    print('Test common sense loss:', score[1])
+    print('Test accuracy:', score[2])
 
-    # # save model
-    # model.save('saved_models/loss_crossentropy.keras')
+    # save model
+    model.save('saved_models/loss_crossentropy.keras')
