@@ -243,10 +243,12 @@ if __name__ == "__main__":
     tf.random.set_seed(seed)
     keras.utils.set_random_seed(seed)
 
+    # preprocess data
     X_train, y_train, X_val, y_val, X_test, y_test, input_shape = load_data(seed=seed, easy=False)
 
     print(X_train.shape, X_val.shape, X_test.shape)
 
+    # make categorical labels for hours
     y_train1 = to_categorical(y_train, 12)
     y_val1 = to_categorical(y_val, 12)
     y_test1 = to_categorical(y_test, 12)
@@ -254,6 +256,7 @@ if __name__ == "__main__":
     img_rows, img_cols = X_train.shape[1], X_train.shape[2]
     input_shape = (img_rows, img_cols, 1)
     print(input_shape)
+
 
     # regression model with two outputs
     model = build_cnn_multi_class_reg(input_shape)
@@ -290,18 +293,21 @@ if __name__ == "__main__":
     tf.random.set_seed(seed)
     keras.utils.set_random_seed(seed)
 
+    # preprocess data
     X_train, y_train, X_val, y_val, X_test, y_test, input_shape = load_data(seed=42, easy=False)
 
     print(X_train.shape, X_val.shape, X_test.shape)
 
+    # convert minute labels to cos and sin
     y_train_m = minute_labels_to_sin_cos(y_train)
     y_val_m = minute_labels_to_sin_cos(y_val)
     y_test_m = minute_labels_to_sin_cos(y_test)
 
+    # convert hour labels to categorical
     y_train_h = to_categorical(y_train, 12)
     y_val_h = to_categorical(y_val, 12)
     y_test_h = to_categorical(y_test, 12)
-
+    # add column to X data
     img_rows, img_cols = X_train.shape[1], X_train.shape[2]
     input_shape = (img_rows, img_cols, 1)
     print(input_shape)

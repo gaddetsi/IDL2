@@ -1,12 +1,10 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, Input, BatchNormalization, Activation
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import backend as K
 from tensorflow.python.framework.ops import SymbolicTensor
-from keras.src import ops
 import os
 
 from get_dataset import download_data
