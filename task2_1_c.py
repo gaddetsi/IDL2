@@ -8,7 +8,7 @@ from tensorflow.keras import backend as K
 from tensorflow.python.framework.ops import SymbolicTensor
 from sklearn.preprocessing import MinMaxScaler
 from keras.src import ops
-from task2_1_a import load_data, to_categorical, common_sense_mse_0
+from task2_1_a import load_data, to_categorical, common_sense_mse
 import os
 
 # uncomment if you want to use the cpu (needed for printing)
@@ -17,65 +17,6 @@ import os
 BATCH_SIZE = 128
 EPOCHS = 1000 # high number since we use early stopping
 
-def split_to_diff_min(pred_time, true_time):
-    """Calculate absolute difference in minutes between predicted and true times."""
-    # if hours are one-hot encoded, convert to numerical
-    hours: np.ndarray = pred_time[0]
-    minutes: np.ndarray = pred_time[1]
-    true_hours: np.ndarray = true_time[0]
-    true_minutes: np.ndarray = true_time[1]
-    if hours.shape[1] == 12:
-        hours = np.argmax(hours, axis=1).reshape(-1, 1)
-
-    # convert time to total minutes
-    pred_total_min = (hours * 60) + minutes
-    true_total_min = (true_hours * 60) + true_minutes
-
-    # common sense loss in minutes
-    diff_min = np.abs(pred_total_min - true_total_min)
-    csl = np.minimum(diff_min, 720 - diff_min)
-
-    return csl
-
-def print_metrics(pred_time, true_time, model_name):
-    """Print comprehensive evaluation metrics."""
-    diff_min = split_to_diff_min(pred_time, true_time)
-
-    mean_err = np.mean(diff_min)
-    median_err = np.median(diff_min)
-    std_err = np.std(diff_min)
-    max_err = np.max(diff_min)
-    
-    within_5 = np.mean(diff_min <= 5) * 100
-    within_10 = np.mean(diff_min <= 10) * 100
-    within_15 = np.mean(diff_min <= 15) * 100
-    within_30 = np.mean(diff_min <= 30) * 100
-    
-    print(f"\n{'=' * 80}")
-    print(f"{model_name} - TEST SET RESULTS")
-    print(f"{'=' * 80}")
-    print(f"Mean Absolute Error:    {mean_err:.2f} minutes")
-    print(f"Median Absolute Error:  {median_err:.2f} minutes")
-    print(f"Std Deviation:          {std_err:.2f} minutes")
-    print(f"Max Error:              {max_err:.2f} minutes")
-    print(f"\nAccuracy within thresholds:")
-    print(f"  Within 5 minutes:     {within_5:.1f}%")
-    print(f"  Within 10 minutes:    {within_10:.1f}%")
-    print(f"  Within 15 minutes:    {within_15:.1f}%")
-    print(f"  Within 30 minutes:    {within_30:.1f}%")
-    
-    return {
-        'mean': mean_err,
-        'median': median_err,
-        'std': std_err,
-        'max': max_err,
-        'within_5': within_5,
-        'within_10': within_10,
-        'within_15': within_15,
-        'within_30': within_30,
-        'predictions': pred_time,
-        'errors': diff_min
-    }
 
 @tf.keras.utils.register_keras_serializable()
 def h_numerical_cs_mse(y_true, y_pred):
@@ -110,209 +51,227 @@ def m_numerical_cs_mse(y_true, y_pred):
 @tf.keras.utils.register_keras_serializable()
 def common_sense_mse_cr(y_true, y_pred):
     """common sense mse from task 2.1.a with num_classes = 12"""
-    return common_sense_mse_0(y_true, y_pred, num_classes=12)
+    return common_sense_mse(y_true, y_pred, num_classes=12)
 
-def build_cnn_multi(input_shape):
-    """CNN with multi-headed regression (two outputs for hours and minutes)."""
-    inputs = Input(shape=input_shape)
-    
-    # First conv block
-    x = Conv2D(32, (3, 3), padding='same')(inputs)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Conv2D(32, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.2)(x)
-    
-    # Second conv block
-    x = Conv2D(64, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Conv2D(64, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.2)(x)
+def hour_labels_to_sin_cos(y):
+    """
+    Convert (hour, minute) → [cos, sin] of hour angle.
+    This encoding handles the circular nature of time.
+    """
+    hours_float = y[:, 0] + y[:, 1] / 60.0
+    angle = 2 * np.pi * hours_float / 12.0  # full rotation = 12 hours
+    y_cos = np.cos(angle)
+    y_sin = np.sin(angle)
+    return np.stack([y_cos, y_sin], axis=1)  # shape: (N, 2)
 
-    # Third conv block
-    x = Conv2D(128, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.3)(x)
+def minute_labels_to_sin_cos(y):
+    """
+    Convert (hour, minute) → [cos, sin] of minute angle.
+    This encoding handles the circular nature of time.
+    """
+    minutes_float = y[:, 1]
+    angle = 2 * np.pi * minutes_float / 60.0  # full rotation = 60 minutes
+    y_cos = np.cos(angle)
+    y_sin = np.sin(angle)
+    return np.stack([y_cos, y_sin], axis=1)  # shape: (N, 2)
 
-    # Dense layers
-    x = Flatten()(x)
-    x = Dense(256)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.4)(x)
-
-    x = Dense(128)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.3)(x)
-
-    # two output layers for hours and minutes
-    hour_output = Dense(1, activation='linear')(x)
-    minute_output = Dense(1, activation='linear')(x)
-
-    return keras.Model(inputs, [hour_output, minute_output], name="cnn_multi_regression")
 
 def build_cnn_multi_class_reg(input_shape):
-    """CNN with multi-headed regression (two outputs for hours and minutes)."""
+    """CNN with multi-headed regression (two paths for hours and minutes)."""
     inputs = Input(shape=input_shape)
     
     # First conv block
-    x = Conv2D(32, (3, 3), padding='same')(inputs)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Conv2D(32, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.2)(x)
+    x1 = Conv2D(32, (3, 3), padding='same')(inputs)
+    x2 = Conv2D(32, (3, 3), padding='same')(inputs)
+    x1 = BatchNormalization()(x1)
+    x2 = BatchNormalization()(x2)
+    x1 = Activation('relu')(x1)
+    x2 = Activation('relu')(x2)
+    x1 = Conv2D(32, (3, 3), padding='same')(x1)
+    x2 = Conv2D(32, (3, 3), padding='same')(x2)
+    x1 = BatchNormalization()(x1)
+    x2 = BatchNormalization()(x2)
+    x1 = Activation('relu')(x1)
+    x2 = Activation('relu')(x2)
+    x1 = MaxPooling2D((2, 2))(x1)
+    x2 = MaxPooling2D((2, 2))(x2)
+    x1 = Dropout(0.2)(x1)
+    x2 = Dropout(0.2)(x2)
     
     # Second conv block
-    x = Conv2D(64, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Conv2D(64, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.2)(x)
+    x1 = Conv2D(64, (3, 3), padding='same')(x1)
+    x2 = Conv2D(64, (3, 3), padding='same')(x2)
+    x1 = BatchNormalization()(x1)
+    x2 = BatchNormalization()(x2)
+    x1 = Activation('relu')(x1)
+    x2 = Activation('relu')(x2)
+    x1 = Conv2D(64, (3, 3), padding='same')(x1)
+    x2 = Conv2D(64, (3, 3), padding='same')(x2)
+    x1 = BatchNormalization()(x1)
+    x2 = BatchNormalization()(x2)
+    x1 = Activation('relu')(x1)
+    x2 = Activation('relu')(x2)
+    x1 = MaxPooling2D((2, 2))(x1)
+    x2 = MaxPooling2D((2, 2))(x2)
+    x1 = Dropout(0.2)(x1)
+    x2 = Dropout(0.2)(x2)
 
     # Third conv block
-    x = Conv2D(128, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.3)(x)
+    x1 = Conv2D(128, (3, 3), padding='same')(x1)
+    x1 = BatchNormalization()(x1)
+    x1 = Activation('relu')(x1)
+    x1 = MaxPooling2D((2, 2))(x1)
+    x1 = Dropout(0.3)(x1)
+
+    x2 = Conv2D(128, (3, 3), padding='same')(x2)
+    x2 = BatchNormalization()(x2)
+    x2 = Activation('relu')(x2)
+    x2 = MaxPooling2D((2, 2))(x2)
+    x2 = Dropout(0.3)(x2)
 
     # Dense layers
-    x = Flatten()(x)
-    x = Dense(256)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.4)(x)
+    x1 = Flatten()(x1)
+    x1 = Dense(256)(x1)
+    x1 = BatchNormalization()(x1)
+    x1 = Activation('relu')(x1)
+    x1 = Dropout(0.4)(x1)
 
-    x = Dense(128)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.3)(x)
+    x2 = Flatten()(x2)
+    x2 = Dense(256)(x2)
+    x2 = BatchNormalization()(x2)
+    x2 = Activation('relu')(x2)
+    x2 = Dropout(0.4)(x2)
+
+    x1 = Flatten()(x1)
+    x1 = Dense(256)(x1)
+    x1 = BatchNormalization()(x1)
+    x1 = Activation('relu')(x1)
+    x1 = Dropout(0.4)(x1)
+
+    x2 = Flatten()(x2)
+    x2 = Dense(256)(x2)
+    x2 = BatchNormalization()(x2)
+    x2 = Activation('relu')(x2)
+    x2 = Dropout(0.4)(x2)
+
+    x1 = Dense(128)(x1)
+    x1 = BatchNormalization()(x1)
+    x1 = Activation('relu')(x1)
+    x1 = Dropout(0.3)(x1)
+
+    x2 = Dense(128)(x2)
+    x2 = BatchNormalization()(x2)
+    x2 = Activation('relu')(x2)
+    x2 = Dropout(0.3)(x2)
 
     # two output layers for hours and minutes
     # hour has 12 output nodes for every hour class (0-11) with softmax activation
-    hour_output = Dense(12, activation='softmax')(x)
-    minute_output = Dense(1, activation='linear')(x)
+    hour_output = Dense(12, activation='softmax')(x1)
+    minute_output = Dense(1, activation='linear')(x2)
 
-    return keras.Model(inputs, [hour_output, minute_output], name="cnn_multi_class_regression")
+    return keras.Model(inputs, [hour_output, minute_output], name="cnn_multi_class_regression_big")
 
 
 
-def build_cnn_sin_cos(input_shape):
+def build_cnn_multi_sin_cos(input_shape):
     """CNN for periodic regression (predicting sin/cos of time angle)."""
     inputs = Input(shape=input_shape)
     
     # First conv block
-    x = Conv2D(32, (3, 3), padding='same')(inputs)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Conv2D(32, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.2)(x)
-
+    x1 = Conv2D(32, (3, 3), padding='same')(inputs)
+    x2 = Conv2D(32, (3, 3), padding='same')(inputs)
+    x1 = BatchNormalization()(x1)
+    x2 = BatchNormalization()(x2)
+    x1 = Activation('relu')(x1)
+    x2 = Activation('relu')(x2)
+    x1 = Conv2D(32, (3, 3), padding='same')(x1)
+    x2 = Conv2D(32, (3, 3), padding='same')(x2)
+    x1 = BatchNormalization()(x1)
+    x2 = BatchNormalization()(x2)
+    x1 = Activation('relu')(x1)
+    x2 = Activation('relu')(x2)
+    x1 = MaxPooling2D((2, 2))(x1)
+    x2 = MaxPooling2D((2, 2))(x2)
+    x1 = Dropout(0.2)(x1)
+    x2 = Dropout(0.2)(x2)
+    
     # Second conv block
-    x = Conv2D(64, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Conv2D(64, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.2)(x)
+    x1 = Conv2D(64, (3, 3), padding='same')(x1)
+    x2 = Conv2D(64, (3, 3), padding='same')(x2)
+    x1 = BatchNormalization()(x1)
+    x2 = BatchNormalization()(x2)
+    x1 = Activation('relu')(x1)
+    x2 = Activation('relu')(x2)
+    x1 = Conv2D(64, (3, 3), padding='same')(x1)
+    x2 = Conv2D(64, (3, 3), padding='same')(x2)
+    x1 = BatchNormalization()(x1)
+    x2 = BatchNormalization()(x2)
+    x1 = Activation('relu')(x1)
+    x2 = Activation('relu')(x2)
+    x1 = MaxPooling2D((2, 2))(x1)
+    x2 = MaxPooling2D((2, 2))(x2)
+    x1 = Dropout(0.2)(x1)
+    x2 = Dropout(0.2)(x2)
 
     # Third conv block
-    x = Conv2D(128, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.3)(x)
+    x1 = Conv2D(128, (3, 3), padding='same')(x1)
+    x1 = BatchNormalization()(x1)
+    x1 = Activation('relu')(x1)
+    x1 = MaxPooling2D((2, 2))(x1)
+    x1 = Dropout(0.3)(x1)
+
+    x2 = Conv2D(128, (3, 3), padding='same')(x2)
+    x2 = BatchNormalization()(x2)
+    x2 = Activation('relu')(x2)
+    x2 = MaxPooling2D((2, 2))(x2)
+    x2 = Dropout(0.3)(x2)
 
     # Dense layers
-    x = Flatten()(x)
-    x = Dense(256)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.4)(x)
+    x1 = Flatten()(x1)
+    x1 = Dense(256)(x1)
+    x1 = BatchNormalization()(x1)
+    x1 = Activation('relu')(x1)
+    x1 = Dropout(0.4)(x1)
 
-    x = Dense(128)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.3)(x)
+    x2 = Flatten()(x2)
+    x2 = Dense(256)(x2)
+    x2 = BatchNormalization()(x2)
+    x2 = Activation('relu')(x2)
+    x2 = Dropout(0.4)(x2)
+
+    x1 = Flatten()(x1)
+    x1 = Dense(256)(x1)
+    x1 = BatchNormalization()(x1)
+    x1 = Activation('relu')(x1)
+    x1 = Dropout(0.4)(x1)
+
+    x2 = Flatten()(x2)
+    x2 = Dense(256)(x2)
+    x2 = BatchNormalization()(x2)
+    x2 = Activation('relu')(x2)
+    x2 = Dropout(0.4)(x2)
+
+    x1 = Dense(128)(x1)
+    x1 = BatchNormalization()(x1)
+    x1 = Activation('relu')(x1)
+    x1 = Dropout(0.3)(x1)
+
+    x2 = Dense(128)(x2)
+    x2 = BatchNormalization()(x2)
+    x2 = Activation('relu')(x2)
+    x2 = Dropout(0.3)(x2)
 
     # Output layer: 2 nodes for cos and sin, bounded by tanh
-    outputs = Dense(2, activation='tanh')(x)
+    hours_output = Dense(2, activation='tanh')(x1)
+    minutes_output = Dense(2, activation='tanh')(x2)
 
-    return keras.Model(inputs, outputs, name="cnn_periodic")
+    return keras.Model(inputs, [hours_output, minutes_output], name="multi_cnn_periodic")
 
 
 if __name__ == "__main__":
     os.makedirs('saved_models', exist_ok=True)
     
-    seed=42
-    np.random.seed(seed)
-    tf.random.set_seed(seed)
-    keras.utils.set_random_seed(seed)
-
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
-
-    print(X_train.shape, X_val.shape, X_test.shape)
-
-    img_rows, img_cols = X_train.shape[1], X_train.shape[2]
-    input_shape = (img_rows, img_cols, 1)
-    print(input_shape)
-
-    # regression model with two outputs
-    model = build_cnn_multi(input_shape)
-    
-    model.compile(loss=[h_numerical_cs_mse, m_numerical_cs_mse],
-                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-                metrics=['accuracy','accuracy'])
-
-    model.summary()
-
-    # Callbacks
-    callbacks = [
-        keras.callbacks.ReduceLROnPlateau(
-            monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
-        ),
-        keras.callbacks.EarlyStopping(
-            monitor='val_loss', patience=15, verbose=1, restore_best_weights=True
-        )
-    ]
-
-    model.fit(X_train, [y_train[:, 0], y_train[:, 1]],
-            batch_size=BATCH_SIZE,
-            epochs=EPOCHS,
-            verbose=1,
-            callbacks=callbacks,
-            validation_data=(X_val, [y_val[:, 0], y_val[:, 1]]))
-
-    score = model.evaluate(X_test, [y_test[:, 0], y_test[:, 1]], verbose=0)
-    print('Test loss:', score[0])
-    print('Test hour loss:', score[1])
-    print('Test minute loss:', score[2])
-    print('Test hour accuracy:', score[3])
-    print('Test minute accuracy:', score[4])
-
-    model.save('saved_models/multi_regression.keras')
-
+    # multi class+regression
     seed=42
     np.random.seed(seed)
     tf.random.set_seed(seed)
@@ -332,11 +291,22 @@ if __name__ == "__main__":
     # regression model with two outputs
     model = build_cnn_multi_class_reg(input_shape)
 
-    model.compile(loss=[common_sense_mse_cr, m_numerical_cs_mse],
+    model.compile(loss=[common_sense_mse_cr, "mse"],
+                loss_weights=[1.0, 1.0],
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                 metrics=['accuracy','accuracy'])
 
     model.summary()
+
+    # Callbacks
+    callbacks = [
+        keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
+        ),
+        keras.callbacks.EarlyStopping(
+            monitor='val_loss', patience=15, verbose=1, restore_best_weights=True
+        )
+    ]
 
     model.fit(X_train, [y_train1, y_train[:, 1]],
             batch_size=BATCH_SIZE,
@@ -353,3 +323,61 @@ if __name__ == "__main__":
     print('Test minute accuracy:', score[4])
 
     model.save('saved_models/multi_class_regression.keras')
+
+    # periodic regression
+    seed=42
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    keras.utils.set_random_seed(seed)
+
+    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
+
+    y_train_m = minute_labels_to_sin_cos(y_train)
+    y_val_m = minute_labels_to_sin_cos(y_val)
+    y_test_m = minute_labels_to_sin_cos(y_test)
+
+    y_train_h = to_categorical(y_train, 12)
+    y_val_h = to_categorical(y_val, 12)
+    y_test_h = to_categorical(y_test, 12)
+
+    print(X_train.shape, X_val.shape, X_test.shape)
+
+    img_rows, img_cols = X_train.shape[1], X_train.shape[2]
+    input_shape = (img_rows, img_cols, 1)
+    print(input_shape)
+
+    # regression model with two outputs
+    model = build_cnn_multi_sin_cos(input_shape)
+
+    model.compile(loss=[common_sense_mse_cr, "mse"],
+                loss_weights=[1.0, 1.0],
+                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+                metrics=['accuracy','accuracy'])
+
+    model.summary()
+
+    # Callbacks
+    callbacks = [
+        keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
+        ),
+        keras.callbacks.EarlyStopping(
+            monitor='val_loss', patience=15, verbose=1, restore_best_weights=True
+        )
+    ]
+
+    model.fit(X_train, [y_train_h, y_train_m],
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            verbose=1,
+            callbacks=callbacks,
+            validation_data=(X_val, [y_val_h, y_val_m]))
+
+    score = model.evaluate(X_test, [y_test_h, y_test_m], verbose=0)
+    print('Test loss:', score[0])
+    print('Test hour loss:', score[1])
+    print('Test minute loss:', score[2])
+    print('Test hour accuracy:', score[3])
+    print('Test minute accuracy:', score[4])
+
+    model.save('saved_models/multi_regression_sin_cos.keras')

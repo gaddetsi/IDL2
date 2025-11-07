@@ -8,7 +8,7 @@ import os, sys
 from pathlib import Path
 
 from task2_1_a import load_data
-from task2_1_c import h_numerical_cs_mse, m_numerical_cs_mse, print_metrics, common_sense_mse_cr
+from task2_1_c import h_numerical_cs_mse, m_numerical_cs_mse, common_sense_mse_cr
 
 def plot_error_histogram(errors, model_name, save_path=None):
     """Plot histogram of prediction errors."""
@@ -25,15 +25,23 @@ def plot_error_histogram(errors, model_name, save_path=None):
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.show()
 
-def to_decimal(y):
-    """Convert split hours and minutes to decimal hours."""
-    hours = y[0]
-    minutes = y[1]
-    if hours.shape[1] == 12:
-        hours = np.argmax(hours, axis=1).reshape(-1, 1)
+def sin_cos_to_hours(sin_cos_predictions):
+    """Convert [cos, sin] predictions back to hours (0-12)."""
+    cos_vals = sin_cos_predictions[:, 0]
+    sin_vals = sin_cos_predictions[:, 1]
+    angles = np.arctan2(sin_vals, cos_vals)  # arctan2(sin, cos)
+    angles = (angles % (2 * np.pi))  # ensure positive angles
+    hours = angles * 12 / (2 * np.pi)  # convert to hours
+    return hours
 
-    decimal_hours = hours + (minutes / 59)
-    return decimal_hours
+def sin_cos_to_minutes(sin_cos_predictions):
+    """Convert [cos, sin] predictions back to minutes (0-59)."""
+    cos_vals = sin_cos_predictions[:, 0]
+    sin_vals = sin_cos_predictions[:, 1]
+    angles = np.arctan2(sin_vals, cos_vals)  # arctan2(sin, cos)
+    angles = (angles % (2 * np.pi))  # ensure positive angles
+    minutes = angles * 59 / (2 * np.pi)  # convert to minutes
+    return minutes
 
 def plot_predictions_vs_true(pred, true, model_name, save_path=None):
     """Scatter plot of predictions vs true values."""
@@ -51,6 +59,96 @@ def plot_predictions_vs_true(pred, true, model_name, save_path=None):
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.show()
+    
+def get_hours_minutes(hours, minutes):
+    """Convert one-hot or sin-cos encoded hours and minutes to numerical hours and minutes."""
+    hours_ = hours
+    if hours_.shape[1] == 12:
+        hours_ = np.argmax(hours_, axis=1).reshape(-1, 1)
+    elif hours_.shape[1] == 2:
+        hours_ = np.floor(sin_cos_to_hours(hours_).reshape(-1, 1))
+
+    minutes_ = minutes
+    if minutes_.shape[1] == 2:
+        minutes_ = sin_cos_to_minutes(minutes_).reshape(-1, 1)
+
+    return hours_, minutes_
+
+def to_decimal(y):
+    """Convert split hours and minutes to decimal hours."""
+    hours = y[0]
+    minutes = y[1]
+    hours, minutes = get_hours_minutes(hours, minutes)
+
+    decimal_hours = hours + (minutes / 60)
+    return decimal_hours
+
+def split_to_diff_min(pred_time, true_time):
+    """Calculate absolute difference in minutes between predicted and true times."""
+    # if hours are one-hot encoded, convert to numerical
+    hours: np.ndarray = pred_time[0]
+    minutes: np.ndarray = pred_time[1]
+    true_hours: np.ndarray = true_time[0]
+    true_minutes: np.ndarray = true_time[1]
+    hours, minutes = get_hours_minutes(hours, minutes)
+    true_hours, true_minutes = get_hours_minutes(true_hours, true_minutes)
+
+    # convert time to total minutes
+    pred_total_min = (hours * 60) + minutes
+    true_total_min = (true_hours * 60) + true_minutes
+
+    # common sense loss in minutes
+    diff_min = np.abs(pred_total_min - true_total_min)
+    csl = np.minimum(diff_min, 720 - diff_min)
+
+    return csl
+
+def print_metrics(pred_time, true_time, model_name):
+    """Print comprehensive evaluation metrics."""
+    diff_min = split_to_diff_min(pred_time, true_time)
+
+    mean_err = np.mean(diff_min)
+    median_err = np.median(diff_min)
+    std_err = np.std(diff_min)
+    max_err = np.max(diff_min)
+    
+    within_0 = np.mean(diff_min <= 0) * 100
+    within_1 = np.mean(diff_min <= 1) * 100
+    within_5 = np.mean(diff_min <= 5) * 100
+    within_10 = np.mean(diff_min <= 10) * 100
+    within_15 = np.mean(diff_min <= 15) * 100
+    within_30 = np.mean(diff_min <= 30) * 100
+    
+    print(f"\n{'=' * 80}")
+    print(f"{model_name} - TEST SET RESULTS")
+    print(f"{'=' * 80}")
+    print(f"Mean Absolute Error:    {mean_err:.2f} minutes")
+    print(f"Median Absolute Error:  {median_err:.2f} minutes")
+    print(f"Std Deviation:          {std_err:.2f} minutes")
+    print(f"Max Error:              {max_err:.2f} minutes")
+    print(f"\nAccuracy within thresholds:")
+    print(f"  Within 0 minutes:     {within_0:.1f}%")
+    print(f"  Within 1 minute:      {within_1:.1f}%")
+    print(f"  Within 5 minutes:     {within_5:.1f}%")
+    print(f"  Within 10 minutes:    {within_10:.1f}%")
+    print(f"  Within 15 minutes:    {within_15:.1f}%")
+    print(f"  Within 30 minutes:    {within_30:.1f}%")
+    
+    return {
+        'mean': mean_err,
+        'median': median_err,
+        'std': std_err,
+        'max': max_err,
+        'within_0': within_0,
+        'within_1': within_1,
+        'within_5': within_5,
+        'within_10': within_10,
+        'within_15': within_15,
+        'within_30': within_30,
+        'predictions': pred_time,
+        'errors': diff_min
+    }
+
 
 
 if __name__ == "__main__":
