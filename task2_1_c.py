@@ -49,7 +49,7 @@ def m_numerical_cs_mse(y_true, y_pred):
     return mse
 
 @tf.keras.utils.register_keras_serializable()
-def common_sense_mse_cr(y_true, y_pred):
+def common_sense_mse_12(y_true, y_pred):
     """common sense mse from task 2.1.a with num_classes = 12"""
     return common_sense_mse(y_true, y_pred, num_classes=12)
 
@@ -262,7 +262,7 @@ def build_cnn_multi_sin_cos(input_shape):
     x2 = Dropout(0.3)(x2)
 
     # Output layer: 2 nodes for cos and sin, bounded by tanh
-    hours_output = Dense(2, activation='tanh')(x1)
+    hours_output = Dense(12, activation='softmax')(x1)
     minutes_output = Dense(2, activation='tanh')(x2)
 
     return keras.Model(inputs, [hours_output, minutes_output], name="multi_cnn_periodic")
@@ -291,7 +291,7 @@ if __name__ == "__main__":
     # regression model with two outputs
     model = build_cnn_multi_class_reg(input_shape)
 
-    model.compile(loss=[common_sense_mse_cr, "mse"],
+    model.compile(loss=[common_sense_mse_12, "mse"],
                 loss_weights=[1.0, 1.0],
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                 metrics=['accuracy','accuracy'])
@@ -349,8 +349,8 @@ if __name__ == "__main__":
     # regression model with two outputs
     model = build_cnn_multi_sin_cos(input_shape)
 
-    model.compile(loss=[common_sense_mse_cr, "mse"],
-                loss_weights=[1.0, 1.0],
+    model.compile(loss=[common_sense_mse_12, "mse"],
+                loss_weights=[1.0, 0.5],
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                 metrics=['accuracy','accuracy'])
 
