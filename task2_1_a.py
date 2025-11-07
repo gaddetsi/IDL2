@@ -141,7 +141,7 @@ def common_sense_mse(y_true,y_pred, num_classes=NUM_CLASSES):
         dist.append(i)
     dist = tf.constant(dist, dtype=tf.float32)
 
-    # rotate distribution so that 1 aligns with true class
+    # rotate distribution so that value 1 aligns with the true class
     # Ex: when index=0 is the correct class, then the distribution 
     # for 4 classes would look like this: [1,2,3,2]
     # , when index = 1 it would look like this: [2,1,2,3]
@@ -198,12 +198,12 @@ def common_sense_mse_0(y_true,y_pred, num_classes=NUM_CLASSES):
         dist.append(i)
     dist = tf.constant(dist, dtype=tf.float32)
 
-    # rotate distribution so that 1 aligns with true class
+    # rotate distribution so that value 0 aligns with the true class
     # Ex: when index=0 is the correct class, then the distribution 
-    # for 4 classes would look like this: [1,2,3,2]
-    # , when index = 1 it would look like this: [2,1,2,3]
+    # for 4 classes would look like this: [0,1,2,1]
+    # , when index = 1 it would look like this: [1,0,1,2]
     def rotate_dist(idx):
-        idx = tf.reshape(idx, ())  # make is a scalar
+        idx = tf.reshape(idx, ())  # make it a scalar
         row = tf.roll(dist, shift=idx, axis=0)
         return row
 
@@ -310,11 +310,8 @@ def preprocess_cat(easy=True, num_classes=NUM_CLASSES):
     # preprocessing categorical data
     X_train, y_train, X_val, y_val, X_test, y_test, input_shape = load_data(seed=42, easy=easy)
 
-    # Convert labels to one-hot encoding
-    # ex.
-    # y_train = to_categorical(y_train, 720) # when doing 720 labels use this
+    # Convert labels to one-hot encoding given the number of classes
     y_train = to_categorical(y_train, num_classes)
-    # print(f"Class and amount:\n{np.sum(y_train,axis=0)}\n") # UNCOMMENT THIS TO GAIN INSIGHT IN THE DISTRIBUTION: print class distribution, the index is the class, the amount is how many times that class is in the data
     y_val = to_categorical(y_val, num_classes)
     y_test = to_categorical(y_test, num_classes)
 
@@ -338,15 +335,16 @@ def experiment_cat(loss_function, model_name: str, easy=True, num_classes=NUM_CL
     # load preprocessed data
     X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat(easy,num_classes)
 
-    # ####################################### make model
+    # init model
     model = build_cnn_catagorical(input_shape, num_classes)
     
 
-    ################## use own loss and accuracy (and regular accuracy) metric
+    # use a chosen loss function and common sense loss as metric and init optimizer and learning rate
     model.compile(loss=loss_function,
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-                metrics=[common_sense_categories_loss,'accuracy'])
-
+                metrics=[common_sense_categories_loss])
+    
+    # show model information
     model.summary()
 
     # make callback that lowers the learning rate when a plateau is reached and has early stopping
@@ -358,7 +356,7 @@ def experiment_cat(loss_function, model_name: str, easy=True, num_classes=NUM_CL
             monitor='val_loss', patience=15, verbose=1, restore_best_weights=True
         )
     ]
-
+    # train model
     model.fit(X_train, y_train,
             batch_size=BATCH_SIZE,
             epochs=EPOCHS,
@@ -366,16 +364,6 @@ def experiment_cat(loss_function, model_name: str, easy=True, num_classes=NUM_CL
             callbacks=callbacks,
             validation_data=(X_val, y_val))
     
-    # get predictions
-    categorical_predictions = model.predict(X_test,verbose=0)
-    # print metrics
-    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name=model_name,num_classes=num_classes)
-    # evaluate model
-    score = model.evaluate(X_test, y_test, verbose=0)
-    print('Test loss:', score[0])
-    print('Test common sense loss:', score[1])
-    print('Test accuracy:', score[2])
-
     # save model
     model.save(f'saved_models/loss_{model_name}.keras')
 
@@ -383,11 +371,11 @@ def experiment_cat(loss_function, model_name: str, easy=True, num_classes=NUM_CL
 if __name__ == "__main__":
     os.makedirs('saved_models', exist_ok=True)
     
-    # run experiments for different loss functions and the easy dataset
-    # experiment_cat(loss_function=common_sense_mse, model_name="common_sense_mse", easy=False)
-    # experiment_cat(loss_function=common_sense_mse_0, model_name="common_sense_mse_0", easy=False)
-    # experiment_cat(loss_function=keras.losses.MSE, model_name="mse", easy=False)
-    # experiment_cat(loss_function=keras.losses.categorical_crossentropy, model_name="crossentropy", easy=False)
+    # run experiments for different loss functions and the hard dataset (150 dataset)
+    experiment_cat(loss_function=common_sense_mse, model_name="common_sense_mse", easy=False)
+    experiment_cat(loss_function=common_sense_mse_0, model_name="common_sense_mse_0", easy=False)
+    experiment_cat(loss_function=keras.losses.MSE, model_name="mse", easy=False)
+    experiment_cat(loss_function=keras.losses.categorical_crossentropy, model_name="crossentropy", easy=False)
 
     # run experiments for different loss functions and the hard dataset
     experiment_cat(loss_function=common_sense_mse_720, model_name="common_sense_mse_hard", easy=False, num_classes=720)
