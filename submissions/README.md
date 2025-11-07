@@ -30,9 +30,50 @@ The script provides:
 - Performance comparison between MLP and CNN models
 
 
+# TASK 2
+
+### Requirements
+- Python 3.x
+- TensorFlow
+- NumPy
+- Matplotlib
+- scikit-learn
+
+### Installation
+```bash
+pip install tensorflow numpy matplotlib scikit-learn
+```
+
+### Data Setup
+The code expects data files in the following structure:
+```
+data/A1_data_150/
+    images.npy
+    labels.npy
+```
+
+## TASK 2.1.a
+
+  ### Categorical Model with different loss functions
+
+## Description
+This project implements CNN classification models to predict time from a clock image.
+The following loss functions are compared using 24 classes:
+- **Commonsense MSE**: Custom loss function combining MSE with common sense
+- **Commonsense MSE 0**: Custom loss function combining MSE with common sense without feedback to the correct class
+- **MSE**: Regular MSE
+- **Categorical cross-entropy**: Regular Categorical cross-entropy
+Afterwards Commonsense MSE is used for 720 classes.
+
+## Usage
+Run the script directly, get metrics and make plots:
+```bash
+python 2.1.a.py
+python ./create_plots_cat.py ./saved_models/loss_*
+```
 
 
-## TASK 2
+## TASK 2.1.b
 
   # Clock Time Regression Models
 
@@ -40,26 +81,6 @@ The script provides:
 This project implements CNN regression models to predict time from clock images using two different approaches:
 - **Plain Regression**: Directly predicts time as a continuous value
 - **Periodic Regression**: Uses sine/cosine encoding to handle the circular nature of time
-
-## Requirements
-- Python 3.x
-- TensorFlow
-- NumPy
-- Matplotlib
-- scikit-learn
-
-## Installation
-```bash
-pip install tensorflow numpy matplotlib scikit-learn
-```
-
-## Data Setup
-The code expects data files in the following structure:
-```
-data/A1_data_150/
-    images.npy
-    labels.npy
-```
 
 ## Usage
 Run the script directly:
