@@ -11,42 +11,8 @@ from keras.src import ops
 from task2_1_a import load_data, to_categorical, common_sense_mse
 import os
 
-# uncomment if you want to use the cpu (needed for printing)
-# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
 BATCH_SIZE = 128
 EPOCHS = 1000 # high number since we use early stopping
-
-
-@tf.keras.utils.register_keras_serializable()
-def h_numerical_cs_mse(y_true, y_pred):
-    """
-    
-    """
-    true = y_true[..., 0]
-    pred = y_pred[..., 0]
-
-    diff = tf.abs(true - pred)
-    wrap = 12 - diff
-    cls = tf.minimum(diff, wrap)
-
-    mse = tf.square(cls / 6)
-    return mse
-
-@tf.keras.utils.register_keras_serializable()
-def m_numerical_cs_mse(y_true, y_pred):
-    """
-    
-    """
-    true = y_true[..., 0]
-    pred = y_pred[..., 0]
-
-    diff = tf.abs(true - pred)
-    wrap = 60 - diff
-    cls = tf.minimum(diff, wrap)
-
-    mse = tf.square(cls / 30)
-    return mse
 
 @tf.keras.utils.register_keras_serializable()
 def common_sense_mse_12(y_true, y_pred):
@@ -291,7 +257,7 @@ if __name__ == "__main__":
 
     # regression model with two outputs
     model = build_cnn_multi_class_reg(input_shape)
-
+    # compile with common sense mse for categorical hours and mse for priodic regession minutes.
     model.compile(loss=[common_sense_mse_12, "mse"],
                 loss_weights=[1.0, 0.5],
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
@@ -299,7 +265,7 @@ if __name__ == "__main__":
 
     model.summary()
 
-    # Callbacks
+    # same Callback as task 2.1.a
     callbacks = [
         keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
@@ -308,21 +274,14 @@ if __name__ == "__main__":
             monitor='val_loss', patience=15, verbose=1, restore_best_weights=True
         )
     ]
-
+    #  fit model
     model.fit(X_train, [y_train1, y_train[:, 1]],
             batch_size=BATCH_SIZE,
             epochs=EPOCHS,
             verbose=1,
             callbacks=callbacks,
             validation_data=(X_val, [y_val1, y_val[:, 1]]))
-
-    score = model.evaluate(X_test, [y_test1, y_test[:, 1]], verbose=0)
-    print('Test loss:', score[0])
-    print('Test hour loss:', score[1])
-    print('Test minute loss:', score[2])
-    print('Test hour accuracy:', score[3])
-    print('Test minute accuracy:', score[4])
-
+    # save model
     model.save('saved_models/multi_class_regression.keras')
 
     # periodic regression
@@ -349,7 +308,7 @@ if __name__ == "__main__":
 
     # regression model with two outputs
     model = build_cnn_multi_sin_cos(input_shape)
-
+    # compile with common sense mse for categorical hours and mse for priodic regession minutes.
     model.compile(loss=[common_sense_mse_12, "mse"],
                 loss_weights=[1.0, 0.5],
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
@@ -357,7 +316,7 @@ if __name__ == "__main__":
 
     model.summary()
 
-    # Callbacks
+    # same Callback as task 2.1.a
     callbacks = [
         keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
@@ -366,19 +325,12 @@ if __name__ == "__main__":
             monitor='val_loss', patience=15, verbose=1, restore_best_weights=True
         )
     ]
-
+    # fit model
     model.fit(X_train, [y_train_h, y_train_m],
             batch_size=BATCH_SIZE,
             epochs=EPOCHS,
             verbose=1,
             callbacks=callbacks,
             validation_data=(X_val, [y_val_h, y_val_m]))
-
-    score = model.evaluate(X_test, [y_test_h, y_test_m], verbose=0)
-    print('Test loss:', score[0])
-    print('Test hour loss:', score[1])
-    print('Test minute loss:', score[2])
-    print('Test hour accuracy:', score[3])
-    print('Test minute accuracy:', score[4])
-
+    #  save model
     model.save('saved_models/multi_regression_sin_cos.keras')

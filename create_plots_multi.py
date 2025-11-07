@@ -9,7 +9,7 @@ from pathlib import Path
 import tensorflow as tf
 
 from task2_1_a import load_data
-from task2_1_c import h_numerical_cs_mse, m_numerical_cs_mse, common_sense_mse_12
+from task2_1_c_and_2_2 import h_numerical_cs_mse, m_numerical_cs_mse, common_sense_mse_12
 
 def plot_error_histogram(errors, model_name, save_path=None):
     """Plot histogram of prediction errors."""
