@@ -231,11 +231,13 @@ def load_data(seed: int,easy=True) -> tuple[np.ndarray, np.ndarray, np.ndarray, 
         y = np.load("data/A1_data_150/labels.npy")
 
     X = X / 255
-    
-    # split data into train, test
-    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=seed)
-    # split train into train, val
-    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, random_state=seed)
+    # Split into train/val/test (80/10/10)
+    X_train_full, X_test, y_train_full, y_test = train_test_split(
+        X, y, test_size=0.10, random_state=42, shuffle=True
+    )
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_train_full, y_train_full, test_size=0.1111, random_state=42, shuffle=True
+    )
 
     return X_train, y_train, X_val, y_val, X_test, y_test
 
