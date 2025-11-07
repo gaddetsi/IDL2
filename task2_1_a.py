@@ -15,34 +15,47 @@ NUM_CLASSES = 24
 BATCH_SIZE = 128
 EPOCHS = 1000 # we use early stopping, so not all epochs will be used
 
-def print_metrics(pred_hours, true_hours, model_name, num_classes=24):
+def print_metrics(pred_hours, true_hours, model_name, num_classes=NUM_CLASSES):
     """Print comprehensive evaluation metrics."""
-    diff_min = common_sense_categories_loss(true_hours,pred_hours)
+    diff_min = common_sense_categories_loss(true_hours,pred_hours) #returns common sense loss in minutes from one hot encoded labels
     
     mean_err = np.mean(diff_min)
     median_err = np.median(diff_min)
     std_err = np.std(diff_min)
     max_err = np.max(diff_min)
     
-    within_30 = np.mean(diff_min <= 1) * 100
-
-    minutes_per_class = 60//(num_classes//12)
+    within_0 = np.mean(diff_min <= 0) * 100
+    within_1 = np.mean(diff_min <= 1) * 100
+    within_5 = np.mean(diff_min <= 5) * 100
+    within_10 = np.mean(diff_min <= 10) * 100
+    within_15 = np.mean(diff_min <= 15) * 100
+    within_30 = np.mean(diff_min <= 30) * 100
 
     print(f"\n{'=' * 80}")
     print(f"{model_name} - TEST SET RESULTS")
     print(f"{'=' * 80}")
-    print(f"Mean Absolute Error:    {mean_err:.2f} of {minutes_per_class} minutes")
-    print(f"Median Absolute Error:  {median_err:.2f} of {minutes_per_class} minutes")
-    print(f"Std Deviation:          {std_err:.2f} of {minutes_per_class} minutes")
-    print(f"Max Error:              {max_err:.2f} of {minutes_per_class} minutes")
+    print(f"Mean Absolute Common Sense Loss:    {mean_err:.2f} minutes")
+    print(f"Median Absolute Common Sense Loss:  {median_err:.2f} minutes")
+    print(f"Std Deviation:                      {std_err:.2f} minutes")
+    print(f"Max Common Sense Loss:              {max_err:.2f} minutes")
     print(f"\nAccuracy within thresholds:")
-    print(f"  Within 30 minutes:    {within_30:.1f}%")
+    print(f"  Within 30 minutes:                {within_30:.1f}%")
+    print(f"  Within 15 minutes:                {within_15:.1f}%")
+    print(f"  Within 10 minutes:                {within_10:.1f}%")
+    print(f"  Within 5 minutes:                 {within_5:.1f}%")
+    print(f"  Within 1 minute:                  {within_1:.1f}%")
+    print(f"  Accuracy:                         {within_0:.1f}%")
     
     return {
         'mean': mean_err,
         'median': median_err,
         'std': std_err,
         'max': max_err,
+        'accuracy': within_0,
+        'within_1': within_1,
+        'within_5': within_5,
+        'within_10': within_10,
+        'within_15': within_15,
         'within_30': within_30,
         'predictions': pred_hours,
         'errors': diff_min
@@ -69,7 +82,7 @@ def to_categorical(y, num_classes):
     return keras.utils.to_categorical(class_, num_classes)
 
 @tf.keras.utils.register_keras_serializable()
-def common_sense_categories_loss(y_true: SymbolicTensor, y_pred: SymbolicTensor) -> SymbolicTensor:
+def common_sense_categories_loss(y_true: SymbolicTensor, y_pred: SymbolicTensor, num_classes = NUM_CLASSES) -> SymbolicTensor:
     """
     --------------------------------------------
     Get common sense loss for categories
@@ -80,15 +93,17 @@ def common_sense_categories_loss(y_true: SymbolicTensor, y_pred: SymbolicTensor)
 
     Common sense loss formula: 
     (highest possible common sence loss) = cls = min(|true_class-pred_class|, ||true_class-pred_class| - number_of_classes|)
+    csl*category_size_in_minutes = common sense loss in minutes
     """
     # read what the class is
     y_true = tf.argmax(y_true, axis=-1) # when printed gives: tf.Tensor(0, shape=(), dtype=int64), here it gives 0 because it is class 0
     y_pred = tf.argmax(y_pred, axis=-1)
 
     #calc common sense loss (cls)
-    diff = tf.abs(y_true - y_pred)                     # difference (not common sence yet)
-    csl = tf.minimum(diff, tf.abs(diff - NUM_CLASSES)) # highest possible common sence loss (=common sence difference)
-    return csl                                         # return common sense loss
+    diff = tf.abs(y_true - y_pred)                        # difference (not common sence yet)
+    csl = tf.minimum(diff, tf.abs(diff - num_classes))    # highest possible common sence loss (=common sence difference)
+    minutes_per_class = 60//(num_classes//12)             # how many minutes per class
+    return csl * minutes_per_class                        # return common sense loss in minutes
 
 
 @tf.keras.utils.register_keras_serializable()
@@ -145,6 +160,10 @@ def common_sense_mse(y_true,y_pred, num_classes=NUM_CLASSES):
     return loss
 
 @tf.keras.utils.register_keras_serializable()
+def common_sense_mse_720(y_true,y_pred):
+    return common_sense_mse(y_true,y_pred, num_classes=720)
+
+@tf.keras.utils.register_keras_serializable()
 def common_sense_mse_0(y_true,y_pred, num_classes=NUM_CLASSES):
     """
     --------------------------------------------
@@ -197,15 +216,19 @@ def common_sense_mse_0(y_true,y_pred, num_classes=NUM_CLASSES):
     loss = tf.reduce_mean(tf.square(diff_with_common_sense), axis=-1)
     return loss
 
-def load_data(seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def load_data(seed: int,easy=True) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_75.zip"
     download_data(url)
 
     url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_150.zip"
     download_data(url)
-
-    X = np.load("data/A1_data_75/images.npy")
-    y = np.load("data/A1_data_75/labels.npy")
+    # choose dataset
+    if easy:
+        X = np.load("data/A1_data_75/images.npy")
+        y = np.load("data/A1_data_75/labels.npy")
+    else:
+        X = np.load("data/A1_data_150/images.npy")
+        y = np.load("data/A1_data_150/labels.npy")
 
     X = X / 255
     
@@ -216,34 +239,6 @@ def load_data(seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray
 
     return X_train, y_train, X_val, y_val, X_test, y_test
 
-# hier
-# def build_cnn_catagorical(input_shape, num_classes):
-#     """CNN for classification (predicting classes)."""
-#     inputs = keras.Input(shape=input_shape)
-    
-#     x = Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
-#     x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
-#     x = MaxPooling2D((2, 2))(x)
-#     x = Dropout(0.25)(x)
-    
-#     x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-#     x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-#     x = MaxPooling2D((2, 2))(x)
-#     x = Dropout(0.25)(x)
-    
-#     x = Conv2D(128, (3, 3), activation='relu', padding='same')(x)
-#     x = MaxPooling2D((2, 2))(x)
-#     x = Dropout(0.25)(x)
-    
-#     x = Flatten()(x)
-#     x = Dense(256, activation='relu')(x)
-#     x = Dropout(0.5)(x)
-#     x = Dense(128, activation='relu')(x)
-#     x = Dropout(0.3)(x)
-
-#     outputs = Dense(num_classes, activation='softmax')(x)
-
-#     return keras.Model(inputs, outputs, name="cnn_classification")
 
 def build_cnn_catagorical(input_shape, num_classes):
     """CNN for predicting categorical values."""
@@ -294,11 +289,9 @@ def build_cnn_catagorical(input_shape, num_classes):
     return keras.Model(inputs, outputs, name="cnn_classification")
 
 
-def preprocess_cat():
+def preprocess_cat(easy=True, num_classes=NUM_CLASSES):
     # preprocessing data
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
-
-    print(X_train.shape, X_val.shape, X_test.shape)
+    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42, easy=easy)
 
     img_rows, img_cols = X_train.shape[1], X_train.shape[2]
     input_shape = (img_rows, img_cols, 1)
@@ -314,43 +307,46 @@ def preprocess_cat():
         X_test = X_test.reshape(X_test.shape[0], img_rows, img_cols, 1)
         input_shape = (img_rows, img_cols, 1)
 
-    print(X_train.shape, X_val.shape, X_test.shape)
-
     # Convert labels to one-hot encoding
     # ex.
     # y_train = to_categorical(y_train, 720) # when doing 720 labels use this
-    y_train = to_categorical(y_train, NUM_CLASSES)
-    print(f"Class and amount:\n{np.sum(y_train,axis=0)}\n") # print class distribution, the index is the class, the amount is how many times that class is in the data
+    y_train = to_categorical(y_train, num_classes)
+    # print(f"Class and amount:\n{np.sum(y_train,axis=0)}\n") # UNCOMMENT THIS TO GAIN INSIGHT IN THE DISTRIBUTION: print class distribution, the index is the class, the amount is how many times that class is in the data
+    y_val = to_categorical(y_val, num_classes)
+    y_test = to_categorical(y_test, num_classes)
 
-    y_val = to_categorical(y_val, NUM_CLASSES)
-    y_test = to_categorical(y_test, NUM_CLASSES)
-
-    print(y_train.shape, y_val.shape, y_test.shape)
     return X_train, y_train, X_val, y_val, X_test, y_test, input_shape
 
-if __name__ == "__main__":
-    os.makedirs('saved_models', exist_ok=True)
 
+def experiment_cat(loss_function, model_name: str, easy=True, num_classes=NUM_CLASSES):
+    """-------------------
+    Run experiment for categorical models, saves models that can be used to plot the graphs.
+    -------------------
+    :param loss_function: loss function to use
+    :param model_name: name of the model (for saving purposes)
+    :param easy: whether to use the easy dataset or hard dataset
+    """
+    # set seeds
     seed=42
     np.random.seed(seed)
     tf.random.set_seed(seed)
     keras.utils.set_random_seed(seed)
 
     # load preprocessed data
-    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat()
+    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat(easy,num_classes)
 
     # ####################################### make model
-    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
+    model = build_cnn_catagorical(input_shape, num_classes)
     
 
     ################## use own loss and accuracy (and regular accuracy) metric
-    model.compile(loss=common_sense_mse_0,
+    model.compile(loss=loss_function,
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                 metrics=[common_sense_categories_loss,'accuracy'])
 
     model.summary()
 
-    # make callbacks
+    # make callback that lowers the learning rate when a plateau is reached and has early stopping
     callbacks = [
         keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
@@ -367,118 +363,29 @@ if __name__ == "__main__":
             callbacks=callbacks,
             validation_data=(X_val, y_val))
     
-    # evaluate the model
+    # get predictions
     categorical_predictions = model.predict(X_test,verbose=0)
-    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="common_sense_mse")
-
+    # print metrics
+    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name=model_name,num_classes=num_classes)
+    # evaluate model
     score = model.evaluate(X_test, y_test, verbose=0)
     print('Test loss:', score[0])
     print('Test common sense loss:', score[1])
     print('Test accuracy:', score[2])
 
     # save model
-    model.save('saved_models/loss_common_sense_mse.keras')
+    model.save(f'saved_models/loss_{model_name}.keras')
 
 
-    # load preprocessed data
-    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat()
-    # ####################################### Init other model with differnt loss function
-    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
+if __name__ == "__main__":
+    os.makedirs('saved_models', exist_ok=True)
     
+    # run experiments for different loss functions and the easy dataset
+    experiment_cat(loss_function=common_sense_mse, model_name="common_sense_mse", easy=False)
+    experiment_cat(loss_function=common_sense_mse_0, model_name="common_sense_mse_0", easy=False)
+    experiment_cat(loss_function=keras.losses.MSE, model_name="mse", easy=False)
+    experiment_cat(loss_function=keras.losses.categorical_crossentropy, model_name="crossentropy", easy=False)
 
-    ################## use own loss and accuracy (and regular accuracy) metric
-    model.compile(loss=common_sense_mse_0,
-                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-                metrics=[common_sense_categories_loss,'accuracy'])
-
-    model.summary()
-
-    # make callbacks
-    callbacks = [
-        keras.callbacks.ReduceLROnPlateau(
-            monitor='val_loss', patience=5, factor=0.5, verbose=1, min_lr=1e-7
-        ),
-        keras.callbacks.EarlyStopping(
-            monitor='val_loss', patience=15, verbose=1, restore_best_weights=True
-        )
-    ]
-
-    model.fit(X_train, y_train,
-            batch_size=BATCH_SIZE,
-            epochs=EPOCHS,
-            verbose=1,
-            callbacks=callbacks,
-            validation_data=(X_val, y_val))
-    
-    # evaluate the model
-    categorical_predictions = model.predict(X_test,verbose=0)
-    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="common_sense_mse_0")
-
-    score = model.evaluate(X_test, y_test, verbose=0)
-    print('Test loss:', score[0])
-    print('Test common sense loss:', score[1])
-    print('Test accuracy:', score[2])
-
-    # save model
-    model.save('saved_models/loss_common_sense_mse_0.keras')
-
-    # load preprocessed data
-    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat()
-    ################ init new model
-    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
-
-    model.compile(loss=keras.losses.MSE,
-                optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-                metrics=[common_sense_categories_loss,'accuracy'])
-
-
-    model.summary()
-
-    model.fit(X_train, y_train,
-            batch_size=BATCH_SIZE,
-            epochs=EPOCHS,
-            verbose=1,
-            callbacks=callbacks,
-            validation_data=(X_val, y_val))
-    
-    # evaluate the model
-    categorical_predictions = model.predict(X_test,verbose=0)
-    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="regular_mse")
-
-    score = model.evaluate(X_test, y_test, verbose=0)
-    print('Test loss:', score[0])
-    print('Test common sense loss:', score[1])
-    print('Test accuracy:', score[2])
-
-    # save model
-    model.save('saved_models/loss_mse.keras')
-
-    # load preprocessed data
-    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat()
-    ################ init new model
-    model = build_cnn_catagorical(input_shape, NUM_CLASSES)
-
-    model.compile(loss=keras.losses.categorical_crossentropy,
-                  optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-                  metrics=[common_sense_categories_loss,'accuracy'])
-
-    model.summary()
-
-    model.fit(X_train, y_train,
-            batch_size=BATCH_SIZE,
-            epochs=EPOCHS,
-            verbose=1,
-            callbacks=callbacks,
-            validation_data=(X_val, y_val))
-
-    # evaluate the model
-    categorical_predictions = model.predict(X_test,verbose=0)
-    metrics_categorical = print_metrics(categorical_predictions, y_test, model_name="loss_crossentropy")
-
-    score = model.evaluate(X_test, y_test, verbose=0)
-    print('Test loss:', score[0])
-    print('Test common sense loss:', score[1])
-    print('Test accuracy:', score[2])
-
-    # save model
-    model.save('saved_models/loss_crossentropy.keras')
+    # run experiments for different loss functions and the hard dataset
+    # experiment_cat(loss_function=common_sense_mse_720, model_name="common_sense_mse_hard", easy=False, num_classes=720)
+    print("Done!")

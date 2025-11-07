@@ -6,7 +6,7 @@ from tensorflow import keras
 import os, sys
 from pathlib import Path
 
-from task2_1_a import load_data, print_metrics, to_categorical
+from task2_1_a import preprocess_cat, print_metrics, to_categorical
 
 def plot_error_histogram(errors, model_name, save_path=None):
     """Plot histogram of prediction errors."""
@@ -42,26 +42,31 @@ def plot_predictions_vs_true(pred_classes, true_classes, model_name, save_path=N
 
 
 if __name__ == "__main__":
+    # create output directory if it doesn't exist
     dir = f"./images/categorical"
     os.makedirs(dir, exist_ok=True)
-
-    # load data
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
-
-    # convert y_test to categorical labels
-    y_test = to_categorical(y_test, 24)
-
     # load model
     for model_path in sys.argv[1:]:
-        model = keras.models.load_model(model_path)
+        # select parameters
+        curr_model = Path(model_path).stem
+        if curr_model.endswith("hard"):
+            num_classes = 720
+            easy = False
+        else:
+            num_classes = 24
+            easy = False
 
+        # load preprocessed data
+        X_train, y_train, X_val, y_val, X_test, y_test, input_shape = preprocess_cat(easy,num_classes)
+        # convert y_test to categorical labels
+        y_test = to_categorical(y_test, num_classes)
+        # load model
+        model = keras.models.load_model(model_path)
         # make predictions
         y_pred = model.predict(X_test)
-
-        curr_model = Path(model_path).stem
-
-        metrics = print_metrics(y_test, y_pred, curr_model)
-
+        # print metrics
+        metrics = print_metrics(y_test, y_pred, curr_model, num_classes)
+        # get common sense loss
         errors = metrics['errors']
 
         # plot error histogram
