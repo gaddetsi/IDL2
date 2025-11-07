@@ -290,7 +290,7 @@ def build_cnn_catagorical(input_shape, num_classes):
 
 
 def preprocess_cat(easy=True, num_classes=NUM_CLASSES):
-    # preprocessing data
+    # preprocessing categorical data
     X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42, easy=easy)
 
     img_rows, img_cols = X_train.shape[1], X_train.shape[2]
