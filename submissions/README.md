@@ -70,7 +70,7 @@ Afterwards Commonsense MSE is used for 720 classes.
 ## Usage
 Run the script directly, get metrics and make plots:
 ```bash
-python 2.1.a.py
+python task2_1_a.py
 python ./create_plots_cat.py ./saved_models/loss_*
 ```
 
@@ -105,3 +105,22 @@ python regression_model.py
 - Automatic saving of the best periodic model
 
 The script will print detailed performance comparisons between the two approaches.
+
+
+
+## TASK 2.1.c and 2.2
+
+  # Multi-head models
+
+## Description
+This project implements CNN multi-head models to predict time from clock images using two strategies in one:
+- **Classificaiton**: Uses classification to predict the hour using the Common sense MSE from the classification models
+- **Plain Regression**: Directly predicts the minutes as a continuous value
+- **Periodic Regression**: The 2.2 model uses sine/cosine encoding to predict the minutes
+
+## Usage
+Run the script directly, get metrics and make plots:
+```bash
+python task2_1_c_and_2_2.py
+python ./create_plots_cat.py ./saved_models/loss_*
+```
