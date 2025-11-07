@@ -160,7 +160,7 @@ if __name__ == "__main__":
     os.makedirs(dir, exist_ok=True)
 
     # load data
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
+    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42, easy=False)
 
     # split y_test into hours and mintes arrays
     y_test_split = list()

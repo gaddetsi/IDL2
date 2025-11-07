@@ -277,7 +277,8 @@ if __name__ == "__main__":
     tf.random.set_seed(seed)
     keras.utils.set_random_seed(seed)
 
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
+    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = load_data(seed=42, easy=False)
+
     print(X_train.shape, X_val.shape, X_test.shape)
 
     y_train1 = to_categorical(y_train, 12)
@@ -292,7 +293,7 @@ if __name__ == "__main__":
     model = build_cnn_multi_class_reg(input_shape)
 
     model.compile(loss=[common_sense_mse_12, "mse"],
-                loss_weights=[1.0, 1.0],
+                loss_weights=[1.0, 0.5],
                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                 metrics=['accuracy','accuracy'])
 
@@ -330,7 +331,21 @@ if __name__ == "__main__":
     tf.random.set_seed(seed)
     keras.utils.set_random_seed(seed)
 
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42)
+    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42, easy=False)
+    img_rows, img_cols = X_train.shape[1], X_train.shape[2]
+
+    if K.image_data_format() == 'channels_first':
+        X_train = X_train.reshape(X_train.shape[0], 1, img_rows, img_cols)
+        X_val = X_val.reshape(X_val.shape[0], 1, img_rows, img_cols)
+        X_test = X_test.reshape(X_test.shape[0], 1, img_rows, img_cols)
+        input_shape = (1, img_rows, img_cols)
+    else:
+        X_train = X_train.reshape(X_train.shape[0], img_rows, img_cols, 1)
+        X_val = X_val.reshape(X_val.shape[0], img_rows, img_cols, 1)
+        X_test = X_test.reshape(X_test.shape[0], img_rows, img_cols, 1)
+        input_shape = (img_rows, img_cols, 1)
+
+    print(X_train.shape, X_val.shape, X_test.shape)
 
     y_train_m = minute_labels_to_sin_cos(y_train)
     y_val_m = minute_labels_to_sin_cos(y_val)
@@ -339,8 +354,6 @@ if __name__ == "__main__":
     y_train_h = to_categorical(y_train, 12)
     y_val_h = to_categorical(y_val, 12)
     y_test_h = to_categorical(y_test, 12)
-
-    print(X_train.shape, X_val.shape, X_test.shape)
 
     img_rows, img_cols = X_train.shape[1], X_train.shape[2]
     input_shape = (img_rows, img_cols, 1)

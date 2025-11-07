@@ -233,13 +233,28 @@ def load_data(seed: int,easy=True) -> tuple[np.ndarray, np.ndarray, np.ndarray, 
     X = X / 255
     # Split into train/val/test (80/10/10)
     X_train_full, X_test, y_train_full, y_test = train_test_split(
-        X, y, test_size=0.10, random_state=42, shuffle=True
+        X, y, test_size=0.10, random_state=seed, shuffle=True
     )
     X_train, X_val, y_train, y_val = train_test_split(
-        X_train_full, y_train_full, test_size=0.1111, random_state=42, shuffle=True
+        X_train_full, y_train_full, test_size=0.1111, random_state=seed, shuffle=True
     )
 
-    return X_train, y_train, X_val, y_val, X_test, y_test
+    # Add channel dimension for CNN
+    img_rows, img_cols = X_train.shape[1], X_train.shape[2]
+    input_shape = (img_rows, img_cols, 1)
+
+    if K.image_data_format() == 'channels_first':
+        X_train = X_train.reshape(X_train.shape[0], 1, img_rows, img_cols)
+        X_val = X_val.reshape(X_val.shape[0], 1, img_rows, img_cols)
+        X_test = X_test.reshape(X_test.shape[0], 1, img_rows, img_cols)
+        input_shape = (1, img_rows, img_cols)
+    else:
+        X_train = X_train.reshape(X_train.shape[0], img_rows, img_cols, 1)
+        X_val = X_val.reshape(X_val.shape[0], img_rows, img_cols, 1)
+        X_test = X_test.reshape(X_test.shape[0], img_rows, img_cols, 1)
+        input_shape = (img_rows, img_cols, 1)
+
+    return X_train, y_train, X_val, y_val, X_test, y_test, input_shape
 
 
 def build_cnn_catagorical(input_shape, num_classes):
@@ -293,21 +308,7 @@ def build_cnn_catagorical(input_shape, num_classes):
 
 def preprocess_cat(easy=True, num_classes=NUM_CLASSES):
     # preprocessing categorical data
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data(seed=42, easy=easy)
-
-    img_rows, img_cols = X_train.shape[1], X_train.shape[2]
-    input_shape = (img_rows, img_cols, 1)
-
-    if K.image_data_format() == 'channels_first':
-        X_train = X_train.reshape(X_train.shape[0], 1, img_rows, img_cols)
-        X_val = X_val.reshape(X_val.shape[0], 1, img_rows, img_cols)
-        X_test = X_test.reshape(X_test.shape[0], 1, img_rows, img_cols)
-        input_shape = (1, img_rows, img_cols)
-    else:
-        X_train = X_train.reshape(X_train.shape[0], img_rows, img_cols, 1)
-        X_val = X_val.reshape(X_val.shape[0], img_rows, img_cols, 1)
-        X_test = X_test.reshape(X_test.shape[0], img_rows, img_cols, 1)
-        input_shape = (img_rows, img_cols, 1)
+    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = load_data(seed=42, easy=easy)
 
     # Convert labels to one-hot encoding
     # ex.
