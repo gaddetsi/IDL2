@@ -1,5 +1,6 @@
 # EXAMPLE USAGE: python ./create_plots_cat.py ./saved_models/loss_*
 
+# RUN THIS FILE TO CREATE PLOTS FOR CATEGORICAL MODELS AND PRINT METRICS
 import matplotlib.pyplot as plt
 import numpy as np
 from tensorflow import keras
