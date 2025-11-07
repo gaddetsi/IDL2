@@ -169,7 +169,7 @@ def build_cnn_multi_class_reg(input_shape):
     hour_output = Dense(12, activation='softmax')(x1)
     minute_output = Dense(1, activation='linear')(x2)
 
-    return keras.Model(inputs, [hour_output, minute_output], name="cnn_multi_class_regression_big")
+    return keras.Model(inputs, [hour_output, minute_output], name="cnn_multi_class_regression")
 
 
 

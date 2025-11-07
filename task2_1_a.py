@@ -216,7 +216,7 @@ def common_sense_mse_0(y_true,y_pred, num_classes=NUM_CLASSES):
     loss = tf.reduce_mean(tf.square(diff_with_common_sense), axis=-1)
     return loss
 
-def load_data(seed: int,easy=True) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def load_data(seed: int,easy=True) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[int, int, int]]:
     url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_75.zip"
     download_data(url)
 
