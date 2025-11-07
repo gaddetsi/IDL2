@@ -384,11 +384,11 @@ if __name__ == "__main__":
     os.makedirs('saved_models', exist_ok=True)
     
     # run experiments for different loss functions and the easy dataset
-    experiment_cat(loss_function=common_sense_mse, model_name="common_sense_mse", easy=False)
-    experiment_cat(loss_function=common_sense_mse_0, model_name="common_sense_mse_0", easy=False)
-    experiment_cat(loss_function=keras.losses.MSE, model_name="mse", easy=False)
-    experiment_cat(loss_function=keras.losses.categorical_crossentropy, model_name="crossentropy", easy=False)
+    # experiment_cat(loss_function=common_sense_mse, model_name="common_sense_mse", easy=False)
+    # experiment_cat(loss_function=common_sense_mse_0, model_name="common_sense_mse_0", easy=False)
+    # experiment_cat(loss_function=keras.losses.MSE, model_name="mse", easy=False)
+    # experiment_cat(loss_function=keras.losses.categorical_crossentropy, model_name="crossentropy", easy=False)
 
     # run experiments for different loss functions and the hard dataset
-    # experiment_cat(loss_function=common_sense_mse_720, model_name="common_sense_mse_hard", easy=False, num_classes=720)
+    experiment_cat(loss_function=common_sense_mse_720, model_name="common_sense_mse_hard", easy=False, num_classes=720)
     print("Done!")
