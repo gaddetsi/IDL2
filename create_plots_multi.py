@@ -6,9 +6,10 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 import os, sys
 from pathlib import Path
+import tensorflow as tf
 
 from task2_1_a import load_data
-from task2_1_c import h_numerical_cs_mse, m_numerical_cs_mse, common_sense_mse_cr
+from task2_1_c import h_numerical_cs_mse, m_numerical_cs_mse, common_sense_mse_12
 
 def plot_error_histogram(errors, model_name, save_path=None):
     """Plot histogram of prediction errors."""
@@ -65,8 +66,6 @@ def get_hours_minutes(hours, minutes):
     hours_ = hours
     if hours_.shape[1] == 12:
         hours_ = np.argmax(hours_, axis=1).reshape(-1, 1)
-    elif hours_.shape[1] == 2:
-        hours_ = np.floor(sin_cos_to_hours(hours_).reshape(-1, 1))
 
     minutes_ = minutes
     if minutes_.shape[1] == 2:
@@ -152,6 +151,11 @@ def print_metrics(pred_time, true_time, model_name):
 
 
 if __name__ == "__main__":
+    seed=42
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    keras.utils.set_random_seed(seed)
+
     dir = f"./images/multi"
     os.makedirs(dir, exist_ok=True)
 
