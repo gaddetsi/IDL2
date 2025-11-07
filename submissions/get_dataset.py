@@ -52,9 +52,10 @@ def download_data(url: str):
 
 
 if __name__ == "__main__":
-    url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_75.zip"
+    url = (
+        r"https://surfdrive.surf.nl/public.php/dav/files/Nznt5c48Mzlb2HY/A1_data_75.zip"
+    )
     download_data(url)
 
-    url = r"https://surfdrive.surf.nl/index.php/s/Nznt5c48Mzlb2HY/download?path=%2F&files=A1_data_150.zip"
+    url = r"https://surfdrive.surf.nl/public.php/dav/files/Nznt5c48Mzlb2HY/A1_data_150.zip"
     download_data(url)
-
