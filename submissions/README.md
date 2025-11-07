@@ -1,3 +1,5 @@
+# Linux is required for GPU usage!
+
 ## TASK 1 
 # MLP and CNN Image Classification
 
