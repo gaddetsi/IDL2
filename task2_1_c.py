@@ -277,7 +277,7 @@ if __name__ == "__main__":
     tf.random.set_seed(seed)
     keras.utils.set_random_seed(seed)
 
-    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = load_data(seed=42, easy=False)
+    X_train, y_train, X_val, y_val, X_test, y_test, input_shape = load_data(seed=seed, easy=False)
 
     print(X_train.shape, X_val.shape, X_test.shape)
 
